@@ -204,12 +204,14 @@ async def gmail_push(request: Request):
     # 사용자 토큰 가져오기
     access_token = user_tokens.get(email_address)
     if not access_token:
+        print(f"No access token for {email_address}")
         return {"status": "user not authenticated"}
 
     # history.list로 새 메시지 조회
     global last_history_id
     if last_history_id is None:
         last_history_id = history_id
+        print("Initialized last_history_id:", last_history_id)
         return {"status": "initialized"}
     gmail_api = "https://gmail.googleapis.com/gmail/v1/users/me/history"
     headers = {"Authorization": f"Bearer {access_token}"}
@@ -221,6 +223,7 @@ async def gmail_push(request: Request):
     last_history_id = history_id
 
     if resp.status_code != 200:
+        print("Failed to fetch history:", resp.text)
         return {"status": "failed to fetch history"}
 
     results = resp.json()
@@ -232,6 +235,7 @@ async def gmail_push(request: Request):
             detail_params = {"format": "full"}
             detail_resp = requests.get(detail_api, headers=headers, params=detail_params)
             if detail_resp.status_code != 200:
+                print(f"Failed to fetch message detail for {msg_id}: {detail_resp.text}")
                 continue
             message_detail = detail_resp.json()
             subject = None
@@ -241,6 +245,14 @@ async def gmail_push(request: Request):
                     break
             body_text = extract_body(message_detail.get("payload", {}))
             snippet = message_detail.get("snippet", "")
+
+            # 메시지 내용 로그로 출력
+            print(f"New Gmail message received!")
+            print(f"Message ID: {msg_id}")
+            print(f"Subject: {subject}")
+            print(f"Snippet: {snippet}")
+            print(f"Body: {body_text}")
+
             messages.append({
                 "id": msg_id,
                 "subject": subject,
