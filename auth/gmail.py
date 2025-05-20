@@ -182,17 +182,24 @@ last_history_id = None
 async def gmail_push(request: Request):
     try:
         body = await request.json()
+        raw_body = await request.body()
+        print("PubSub raw body:", raw_body)
+        print("PubSub parsed JSON:", body)
     except Exception:
         # 바디가 비었거나 JSON이 아닐 때
         return {"status": "empty or invalid body"}
     # Pub/Sub 메시지에서 data 추출 및 디코딩
     message_data = body.get("message", {}).get("data")
     if not message_data:
+        print("No data field in Pub/Sub message")
         return {"status": "no data"}
     decoded = base64.urlsafe_b64decode(message_data + '==').decode("utf-8")
+    print("Decoded PubSub message data:", decoded)
     payload = json.loads(decoded)
+    print("Decoded payload as dict:", payload)
     email_address = payload["emailAddress"]
     history_id = payload["historyId"]
+    print(f"emailAddress: {email_address}, historyId: {history_id}")
 
     # 사용자 토큰 가져오기
     access_token = user_tokens.get(email_address)
