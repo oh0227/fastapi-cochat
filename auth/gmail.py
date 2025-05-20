@@ -175,8 +175,8 @@ def get_gmail_latest_messages(email: str):
 # Gmail Push Notification Webhook (Pub/Sub)
 # =========================
 
-# historyId를 메모리에 저장 (실서비스는 DB 사용)
-last_history_id = None
+# 계정별로 historyId를 저장 (실서비스는 DB 사용)
+last_history_ids = {}
 
 @router.post("/gmail/push")
 async def gmail_push(request: Request):
@@ -207,23 +207,24 @@ async def gmail_push(request: Request):
         print(f"No access token for {email_address}")
         return {"status": "user not authenticated"}
 
-    # history.list로 새 메시지 조회
-    global last_history_id
-    if last_history_id is None:
-        last_history_id = history_id
-        print("Initialized last_history_id:", last_history_id)
+    # 계정별로 historyId 관리
+    global last_history_ids
+    if email_address not in last_history_ids:
+        last_history_ids[email_address] = history_id
+        print(f"Initialized last_history_id for {email_address}: {history_id}")
         return {"status": "initialized"}
+
     gmail_api = "https://gmail.googleapis.com/gmail/v1/users/me/history"
     headers = {"Authorization": f"Bearer {access_token}"}
     params = {
-        "startHistoryId": last_history_id,
+        "startHistoryId": last_history_ids[email_address],
         "historyTypes": "messageAdded"
     }
     resp = requests.get(gmail_api, headers=headers, params=params)
-    last_history_id = history_id
+    last_history_ids[email_address] = history_id
 
     if resp.status_code != 200:
-        print("Failed to fetch history:", resp.text)
+        print(f"Failed to fetch history for {email_address}: {resp.text}")
         return {"status": "failed to fetch history"}
 
     results = resp.json()
@@ -235,7 +236,7 @@ async def gmail_push(request: Request):
             detail_params = {"format": "full"}
             detail_resp = requests.get(detail_api, headers=headers, params=detail_params)
             if detail_resp.status_code != 200:
-                print(f"Failed to fetch message detail for {msg_id}: {detail_resp.text}")
+                print(f"Failed to fetch message detail for {email_address} / {msg_id}: {detail_resp.text}")
                 continue
             message_detail = detail_resp.json()
             subject = None
@@ -247,7 +248,7 @@ async def gmail_push(request: Request):
             snippet = message_detail.get("snippet", "")
 
             # 메시지 내용 로그로 출력
-            print(f"New Gmail message received!")
+            print(f"[{email_address}] New Gmail message received!")
             print(f"Message ID: {msg_id}")
             print(f"Subject: {subject}")
             print(f"Snippet: {snippet}")
