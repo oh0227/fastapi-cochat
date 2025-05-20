@@ -1,8 +1,8 @@
 from fastapi import FastAPI
 from routers import user
+from routers import gmail
 from database import models
 from auth import authentication
-from auth import gmail
 from database.database import engine
 from fastapi.middleware.cors import CORSMiddleware
 

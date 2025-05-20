@@ -1,37 +1,53 @@
 from typing import List
-from schemas import UserBase, UserDisplay, UserUpdate
-from fastapi import APIRouter, Depends
+from schemas import UserBase, UserCreate, UserUpdate, UserDisplay
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from database.database import get_db
 from database import db_user
 from auth.oauth2 import get_current_user
 
 router = APIRouter(
-  prefix='/user',
-  tags=['user']
+    prefix='/user',
+    tags=['user']
 )
 
 # Create user
 @router.post('/', response_model=UserDisplay)
-def create_user(request: UserBase, db: Session = Depends(get_db)):
-  return db_user.create_user(db, request)
+def create_user(request: UserCreate, db: Session = Depends(get_db)):
+    return db_user.create_user(db, request)
 
 # Read all users
 @router.get('/', response_model=List[UserDisplay])
-def get_all_users(db: Session=Depends(get_db), current_user: UserBase = Depends(get_current_user)):
-  return db_user.get_all_users(db)
+def get_all_users(
+    db: Session = Depends(get_db),
+    current_user: UserDisplay = Depends(get_current_user)
+):
+    return db_user.get_all_users(db)
 
 # Read one user
 @router.get('/{id}', response_model=UserDisplay)
-def get_user(id: int, db: Session = Depends(get_db), current_user: UserBase = Depends(get_current_user)):
-  return db_user.get_user(db, id)
+def get_user(
+    id: int,
+    db: Session = Depends(get_db),
+    current_user: UserDisplay = Depends(get_current_user)
+):
+    return db_user.get_user(db, id)
 
 # Update user
-@router.post('/{id}/update')
-def update_user(id: int, request: UserUpdate, db: Session = Depends(get_db), current_user: UserBase = Depends(get_current_user)):
-  return db_user.update_user(db, id, request)
+@router.put('/{id}', response_model=UserDisplay)
+def update_user(
+    id: int,
+    request: UserUpdate,
+    db: Session = Depends(get_db),
+    current_user: UserDisplay = Depends(get_current_user)
+):
+    return db_user.update_user(db, id, request)
 
 # Delete user
-@router.get('/delete/{id}')
-def delete(id: int, db: Session = Depends(get_db), current_user: UserBase = Depends(get_current_user)):
-  return db_user.delete_user(db, id)
+@router.delete('/{id}', response_model=dict)
+def delete_user(
+    id: int,
+    db: Session = Depends(get_db),
+    current_user: UserDisplay = Depends(get_current_user)
+):
+    return db_user.delete_user(db, id)

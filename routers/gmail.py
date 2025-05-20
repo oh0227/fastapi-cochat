@@ -7,6 +7,12 @@ from fastapi.responses import RedirectResponse, JSONResponse
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from dotenv import load_dotenv
+from fastapi import APIRouter, Request, HTTPException, Depends
+from fastapi.responses import RedirectResponse, JSONResponse
+from sqlalchemy.orm import Session
+from database.database import get_db
+from database.models import DbUser, DbMessengerAccount, DbMessage
+from datetime import datetime
 
 load_dotenv()
 
@@ -17,10 +23,25 @@ PUBSUB_TOPIC_NAME = os.getenv("PUBSUB_TOPIC_NAME")
 REDIRECT_URI = os.getenv("REDIRECT_URI")
 SCOPE = "https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/userinfo.email"
 
-router = APIRouter()
+router = APIRouter(
+    prefix="/gmail",
+    tags=['gmail']
+)
 
-# 메모리 저장소(실서비스는 DB 사용)
-user_tokens = {}
+def extract_body(payload):
+    if "body" in payload and "data" in payload["body"]:
+        data = payload["body"]["data"]
+        return base64.urlsafe_b64decode(data.encode("utf-8")).decode("utf-8")
+    elif "parts" in payload:
+        for part in payload["parts"]:
+            if part.get("mimeType") == "text/plain" and "data" in part.get("body", {}):
+                data = part["body"]["data"]
+                return base64.urlsafe_b64decode(data.encode("utf-8")).decode("utf-8")
+            elif "parts" in part:
+                result = extract_body(part)
+                if result:
+                    return result
+    return None
 
 @router.get("/auth/login")
 def login():
@@ -37,7 +58,7 @@ def login():
     return RedirectResponse(auth_url)
 
 @router.get("/auth/callback")
-def auth_callback(code: str):
+def auth_callback(code: str, db: Session = Depends(get_db)):
     # Authorization Code로 Access Token 교환
     token_url = "https://oauth2.googleapis.com/token"
     data = {
@@ -63,8 +84,43 @@ def auth_callback(code: str):
     userinfo = userinfo_resp.json()
     email = userinfo["email"]
 
-    # (예시) 토큰을 메모리에 저장
-    user_tokens[email] = access_token
+    # DbUser에서 사용자 조회 또는 생성
+    user = db.query(DbUser).filter(DbUser.email == email).first()
+    if not user:
+        user = DbUser(
+            first_name=userinfo.get("given_name", ""),
+            last_name=userinfo.get("family_name", ""),
+            email=email,
+            timestamp=datetime.utcnow()
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+
+    # DbMessengerAccount에 연동 정보 저장/업데이트
+    messenger_account = db.query(DbMessengerAccount).filter(
+        DbMessengerAccount.user_id == user.id,
+        DbMessengerAccount.messenger == "gmail",
+        DbMessengerAccount.messenger_user_id == email
+    ).first()
+    if not messenger_account:
+        messenger_account = DbMessengerAccount(
+            user_id=user.id,
+            messenger="gmail",
+            messenger_user_id=email,
+            access_token=access_token,
+            refresh_token=tokens.get("refresh_token"),
+            token_expiry=datetime.utcfromtimestamp(tokens.get("expires_in", 0)) if tokens.get("expires_in") else None,
+            timestamp=datetime.utcnow()
+        )
+        db.add(messenger_account)
+    else:
+        messenger_account.access_token = access_token
+        messenger_account.refresh_token = tokens.get("refresh_token") or messenger_account.refresh_token
+        messenger_account.token_expiry = datetime.utcfromtimestamp(tokens.get("expires_in", 0)) if tokens.get("expires_in") else messenger_account.token_expiry
+        messenger_account.timestamp = datetime.utcnow()
+    db.commit()
+
 
     try:
         # Credentials 객체 생성
@@ -90,96 +146,59 @@ def auth_callback(code: str):
 
     return JSONResponse({"msg": "Login successful", "email": email})
 
-@router.get("/gmail/messages")
-def get_gmail_messages(email: str):
-    # 저장된 토큰으로 Gmail API 호출
-    access_token = user_tokens.get(email)
-    if not access_token:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-
-    gmail_api = "https://gmail.googleapis.com/gmail/v1/users/me/messages"
-    headers = {"Authorization": f"Bearer {access_token}"}
-    resp = requests.get(gmail_api, headers=headers)
-    if resp.status_code != 200:
-        raise HTTPException(status_code=400, detail="Failed to fetch messages")
-    return resp.json()
-
-# 4. 본문 추출 함수
-def extract_body(payload):
-    if "body" in payload and "data" in payload["body"]:
-        data = payload["body"]["data"]
-        return base64.urlsafe_b64decode(data.encode("utf-8")).decode("utf-8")
-    elif "parts" in payload:
-        for part in payload["parts"]:
-            if part.get("mimeType") == "text/plain" and "data" in part.get("body", {}):
-                data = part["body"]["data"]
-                return base64.urlsafe_b64decode(data.encode("utf-8")).decode("utf-8")
-            elif "parts" in part:
-                result = extract_body(part)
-                if result:
-                    return result
-    return None
-
-@router.get("/gmail/latest_messages")
-def get_gmail_latest_messages(email: str):
-    # 저장된 토큰으로 Gmail API 호출
-    access_token = user_tokens.get(email)
-    if not access_token:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-
-    # 1. 최신 메시지 1개만 가져오기
-    gmail_api = "https://gmail.googleapis.com/gmail/v1/users/me/messages"
-    headers = {"Authorization": f"Bearer {access_token}"}
-    params = {
-        "maxResults": 1,
-        "labelIds": "INBOX",
-        "q": "",  # 필요시 쿼리 추가
-    }
-    resp = requests.get(gmail_api, headers=headers, params=params)
-    if resp.status_code != 200:
-        raise HTTPException(status_code=400, detail="Failed to fetch messages")
-    messages = resp.json().get("messages", [])
+@router.get("/messages")
+def get_gmail_messages(email: str, db: Session = Depends(get_db)):
+    """
+    DB에서 해당 email(수신자)의 모든 메시지 목록을 반환
+    """
+    messages = db.query(DbMessage)\
+        .filter(DbMessage.receiver_id == email)\
+        .order_by(DbMessage.timestamp.desc())\
+        .all()
     if not messages:
         raise HTTPException(status_code=404, detail="No messages found")
+    # 필요한 필드만 반환
+    return [
+        {
+            "id": msg.id,
+            "messenger": msg.messenger,
+            "sender_id": msg.sender_id,
+            "receiver_id": msg.receiver_id,
+            "content": msg.content,
+            "category": msg.category,
+            "timestamp": msg.timestamp,
+        }
+        for msg in messages
+    ]
 
-    message_id = messages[0]["id"]
-
-    # 2. 해당 메시지 상세 정보 조회 (본문 포함)
-    detail_api = f"https://gmail.googleapis.com/gmail/v1/users/me/messages/{message_id}"
-    detail_params = {"format": "full"}
-    detail_resp = requests.get(detail_api, headers=headers, params=detail_params)
-    if detail_resp.status_code != 200:
-        raise HTTPException(status_code=400, detail="Failed to fetch message detail")
-    message_detail = detail_resp.json()
-
-    # 3. 제목 추출
-    subject = None
-    for header in message_detail.get("payload", {}).get("headers", []):
-        if header["name"].lower() == "subject":
-            subject = header["value"]
-            break
-
-    body = extract_body(message_detail.get("payload", {}))
-
-    # 5. snippet(미리보기)도 함께 반환
-    snippet = message_detail.get("snippet", "")
-
+@router.get("/latest_messages")
+def get_gmail_latest_messages(email: str, db: Session = Depends(get_db)):
+    """
+    DB에서 해당 email(수신자)의 가장 최근 메시지 1개를 반환
+    """
+    msg = db.query(DbMessage)\
+        .filter(DbMessage.receiver_id == email)\
+        .order_by(DbMessage.timestamp.desc())\
+        .first()
+    if not msg:
+        raise HTTPException(status_code=404, detail="No messages found")
     return {
-        "id": message_id,
-        "subject": subject,
-        "snippet": snippet,
-        "body": body,
+        "id": msg.id,
+        "messenger": msg.messenger,
+        "sender_id": msg.sender_id,
+        "receiver_id": msg.receiver_id,
+        "content": msg.content,
+        "category": msg.category,
+        "timestamp": msg.timestamp,
     }
 
 # =========================
 # Gmail Push Notification Webhook (Pub/Sub)
 # =========================
 
-# 계정별로 historyId를 저장 (실서비스는 DB 사용)
-last_history_ids = {}
 
-@router.post("/gmail/push")
-async def gmail_push(request: Request):
+@router.post("/push")
+async def gmail_push(request: Request, db: Session = Depends(get_db)):
     try:
         body = await request.json()
         raw_body = await request.body()
@@ -197,31 +216,48 @@ async def gmail_push(request: Request):
     print("Decoded PubSub message data:", decoded)
     payload = json.loads(decoded)
     print("Decoded payload as dict:", payload)
+
     email_address = payload["emailAddress"]
     history_id = payload["historyId"]
-    print(f"emailAddress: {email_address}, historyId: {history_id}")
 
-    # 사용자 토큰 가져오기
-    access_token = user_tokens.get(email_address)
+    # 사용자 및 연동 계정 조회
+    user = db.query(DbUser).filter(DbUser.email == email_address).first()
+    if not user:
+        print(f"No user found for {email_address}")
+        return {"status": "user not found"}
+    messenger_account = db.query(DbMessengerAccount).filter(
+        DbMessengerAccount.user_id == user.id,
+        DbMessengerAccount.messenger == "gmail",
+        DbMessengerAccount.messenger_user_id == email_address
+    ).first()
+    if not messenger_account:
+        print(f"No messenger account for {email_address}")
+        return {"status": "messenger account not found"}
+
+    # access_token 가져오기
+    access_token = messenger_account.access_token
     if not access_token:
         print(f"No access token for {email_address}")
         return {"status": "user not authenticated"}
 
-    # 계정별로 historyId 관리
-    global last_history_ids
-    if email_address not in last_history_ids:
-        last_history_ids[email_address] = history_id
-        print(f"Initialized last_history_id for {email_address}: {history_id}")
+    # 계정별 historyId 관리 (DB에 저장)
+    if not messenger_account.history_id:
+        messenger_account.history_id = str(history_id)
+        messenger_account.timestamp = datetime.utcnow()
+        db.commit()
+        print(f"Initialized history_id for {email_address}: {history_id}")
         return {"status": "initialized"}
 
     gmail_api = "https://gmail.googleapis.com/gmail/v1/users/me/history"
     headers = {"Authorization": f"Bearer {access_token}"}
     params = {
-        "startHistoryId": last_history_ids[email_address],
+        "startHistoryId": messenger_account.history_id,
         "historyTypes": "messageAdded"
     }
     resp = requests.get(gmail_api, headers=headers, params=params)
-    last_history_ids[email_address] = history_id
+    messenger_account.history_id = str(history_id)
+    messenger_account.timestamp = datetime.utcnow()
+    db.commit()
 
     if resp.status_code != 200:
         print(f"Failed to fetch history for {email_address}: {resp.text}")
@@ -254,11 +290,21 @@ async def gmail_push(request: Request):
             print(f"Snippet: {snippet}")
             print(f"Body: {body_text}")
 
+            # 메시지 DB 저장
+            db_message = DbMessage(
+                messenger="gmail",
+                sender_id=message_detail.get("payload", {}).get("headers", [{}])[0].get("value", ""),  # 필요시 개선
+                receiver_id=email_address,
+                content=body_text,
+                category=None,
+                timestamp=datetime.utcnow()
+            )
+            db.add(db_message)
             messages.append({
                 "id": msg_id,
                 "subject": subject,
                 "snippet": snippet,
                 "body": body_text,
             })
-
+    db.commit()
     return {"new_messages": messages}
