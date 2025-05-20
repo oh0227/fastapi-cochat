@@ -12,3 +12,13 @@ class DbUser(Base):
   email = Column(String)
   password = Column(String)
   timestamp = Column(DateTime)
+
+class DbMessage(Base):
+  __tablename__ = 'messages'
+  id = Column(Integer, primary_key=True, index=True)
+  messenger = Column(String)
+  sender_id = Column(String)
+  receiver_id = Column(String)
+  content = Column(String)
+  category = Column(String)
+  timestamp = Column(DateTime)

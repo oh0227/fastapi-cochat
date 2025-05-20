@@ -1,12 +1,14 @@
 from fastapi import FastAPI
 from routers import user
 from database import models
+from auth import authentication
 from auth import gmail
 from database.database import engine
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
 app.include_router(gmail.router)
+app.include_router(authentication.router)
 app.include_router(user.router)
 
 models.Base.metadata.create_all(engine)
