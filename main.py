@@ -12,7 +12,8 @@ app.include_router(user.router)
 models.Base.metadata.create_all(engine)
 
 origins = [
-  'http://localhost:3000'
+  'http://localhost:3000',
+  'https://fastapi-cochat.onrender.com'
 ]
 
 app.add_middleware(
