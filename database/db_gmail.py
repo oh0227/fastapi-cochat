@@ -210,11 +210,6 @@ async def gmail_push(request: Request, db: Session = Depends(get_db)):
     if not messenger_account:
         print(f"No messenger account for {email_address}")
         return {"status": "messenger account not found"}
-    
-    user = db.query(DbUser).filter(DbUser.id == messenger_account.user_id).first()
-    if not user:
-      print(f"No user found for {email_address}")
-      return {"status": "user not found"}
 
     # access_token 가져오기
     access_token = messenger_account.access_token

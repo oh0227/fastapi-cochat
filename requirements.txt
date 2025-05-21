@@ -3,7 +3,7 @@ uvicorn
 sqlalchemy
 aiofiles
 requests
-bcrypt
+bcrypt==4.0.1
 python-multipart
 python-jose
 passlib
