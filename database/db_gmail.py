@@ -293,6 +293,7 @@ async def gmail_push(request: Request, db: Session = Depends(get_db)):
                 messenger_account_id = messenger_account.id,
                 sender_id=sender,
                 receiver_id=receiver,
+                subject=subject,
                 content=body_text,
                 category=None,
                 timestamp=datetime.utcnow()

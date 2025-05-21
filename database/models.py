@@ -39,6 +39,7 @@ class DbMessage(Base):
     messenger = Column(String)
     sender_id = Column(String)
     receiver_id = Column(String)  # 실제 수신자 주소 (예: 이메일)
+    subject = Column(String)
     content = Column(String)
     category = Column(String)
     timestamp = Column(DateTime)
