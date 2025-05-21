@@ -44,4 +44,4 @@ def get_gmail_latest_messages(cochat_id: str, db: Session = Depends(get_db), cur
 
 @router.post("/push")
 async def gmail_push(request: Request, db: Session = Depends(get_db)):
-    db_gmail.gmail_push(request, db)
+    return db_gmail.gmail_push(request, db)
