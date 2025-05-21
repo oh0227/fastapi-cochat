@@ -233,7 +233,54 @@ async def gmail_push(request: Request, db: Session = Depends(get_db)):
     }
     resp = requests.get(gmail_api, headers=headers, params=params)
     messenger_account.history_id = str(history_id)
-    print(messenger_account.history_id)
     db.commit()
 
-    return {"history_id": messenger_account.history_id}
+    if resp.status_code != 200:
+        print(f"Failed to fetch history for {email_address}: {resp.text}")
+        return {"status": "failed to fetch history"}
+
+    results = resp.json()
+    messages = []
+    for history in results.get('history', []):
+        for msg in history.get('messagesAdded', []):
+            msg_id = msg['message']['id']
+            detail_api = f"https://gmail.googleapis.com/gmail/v1/users/me/messages/{msg_id}"
+            detail_params = {"format": "full"}
+            detail_resp = requests.get(detail_api, headers=headers, params=detail_params)
+            if detail_resp.status_code != 200:
+                print(f"Failed to fetch message detail for {email_address} / {msg_id}: {detail_resp.text}")
+                continue
+            message_detail = detail_resp.json()
+            subject = None
+            for header in message_detail.get("payload", {}).get("headers", []):
+                if header["name"].lower() == "subject":
+                    subject = header["value"]
+                    break
+            body_text = extract_body(message_detail.get("payload", {}))
+            snippet = message_detail.get("snippet", "")
+
+            # 메시지 내용 로그로 출력
+            print(f"[{email_address}] New Gmail message received!")
+            print(f"Message ID: {msg_id}")
+            print(f"Subject: {subject}")
+            print(f"Snippet: {snippet}")
+            print(f"Body: {body_text}")
+
+            # 메시지 DB 저장
+            db_message = DbMessage(
+                messenger="gmail",
+                sender_id=message_detail.get("payload", {}).get("headers", [{}])[0].get("value", ""),  # 필요시 개선
+                receiver_id=email_address,
+                content=body_text,
+                category=None,
+                timestamp=datetime.utcnow()
+            )
+            db.add(db_message)
+            messages.append({
+                "id": msg_id,
+                "subject": subject,
+                "snippet": snippet,
+                "body": body_text,
+            })
+    db.commit()
+    return {"new_messages": messages}
