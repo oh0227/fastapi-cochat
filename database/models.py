@@ -34,10 +34,11 @@ class DbMessengerAccount(Base):
 class DbMessage(Base):
     __tablename__ = 'messages'
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(String, ForeignKey('users.cochat_id'))  # CoChat 사용자와 연결
+    user_id = Column(String, ForeignKey('users.cochat_id'))
+    messenger_account_id = Column(Integer, ForeignKey('messenger_accounts.id'))  # id 참조
     messenger = Column(String)
     sender_id = Column(String)
-    receiver_id = Column(String, ForeignKey('messenger_accounts.messenger_user_id'))
+    receiver_id = Column(String)  # 실제 수신자 주소 (예: 이메일)
     content = Column(String)
     category = Column(String)
     timestamp = Column(DateTime)

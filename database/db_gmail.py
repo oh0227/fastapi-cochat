@@ -290,6 +290,7 @@ async def gmail_push(request: Request, db: Session = Depends(get_db)):
             db_message = DbMessage(
                 messenger="gmail",
                 user_id=user.cochat_id,
+                messenger_account_id = messenger_account.id,
                 sender_id=sender,
                 receiver_id=receiver,
                 content=body_text,
