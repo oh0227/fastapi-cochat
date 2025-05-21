@@ -213,7 +213,7 @@ async def gmail_push(request: Request, db: Session = Depends(get_db)):
 
 
     user = db.query(DbUser).filter(
-        DbUser.cochat_id == messenger_account.messenger_user_id,
+        DbUser.cochat_id == messenger_account.user_id,
     ).first()
     if not user:
         print(f"No user for {messenger_account.messenger_user_id}")
