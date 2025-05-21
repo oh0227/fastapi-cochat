@@ -13,6 +13,7 @@ class DbUser(Base):
     timestamp = Column(DateTime)
     # 여러 메신저 계정과 연결
     messengers = relationship("DbMessengerAccount", back_populates="user")
+    messages = relationship("DbMessage", back_populates="user")
 
 class DbMessengerAccount(Base):
     __tablename__ = 'messenger_accounts'
@@ -26,17 +27,19 @@ class DbMessengerAccount(Base):
     token_expiry = Column(DateTime)
     timestamp = Column(DateTime)
     user = relationship("DbUser", back_populates="messengers")
+    messages = relationship("DbMessage", back_populates="messengers")
     __table_args__ = (UniqueConstraint('user_id', 'messenger', 'messenger_user_id', name='_user_messenger_uc'),)
 
 
 class DbMessage(Base):
     __tablename__ = 'messages'
     id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(String, ForeignKey('users.cochat_id'))  # CoChat 사용자와 연결
     messenger = Column(String)
     sender_id = Column(String)
-    receiver_id = Column(String)
+    receiver_id = Column(String, ForeignKey('messenger_accounts.messenger_user_id'))
     content = Column(String)
     category = Column(String)
     timestamp = Column(DateTime)
-    # 필요하다면 메시지와 메신저 계정 연결도 가능
-    # messenger_account_id = Column(Integer, ForeignKey('messenger_accounts.id'))
+    user = relationship("DbUser", back_populates="messages")
+    messengers = relationship("DbMessengerAccount", back_populates="messages")

@@ -211,6 +211,15 @@ async def gmail_push(request: Request, db: Session = Depends(get_db)):
         print(f"No messenger account for {email_address}")
         return {"status": "messenger account not found"}
 
+
+    user = db.query(DbUser).filter(
+        DbUser.cochat_id == messenger_account.messenger_user_id,
+    ).first()
+    if not user:
+        print(f"No user for {messenger_account.messenger_user_id}")
+        return {"status": "user account not found"}
+    
+
     # access_token 가져오기
     access_token = messenger_account.access_token
     if not access_token:
@@ -248,29 +257,41 @@ async def gmail_push(request: Request, db: Session = Depends(get_db)):
             detail_params = {"format": "full"}
             detail_resp = requests.get(detail_api, headers=headers, params=detail_params)
             if detail_resp.status_code != 200:
-                print(f"Failed to fetch message detail for {email_address} / {msg_id}: {detail_resp.text}")
                 continue
             message_detail = detail_resp.json()
+
+            # 헤더에서 subject, from, to 추출
+            headers = message_detail.get("payload", {}).get("headers", [])
             subject = None
-            for header in message_detail.get("payload", {}).get("headers", []):
-                if header["name"].lower() == "subject":
+            sender = None
+            receiver = None
+            for header in headers:
+                name = header["name"].lower()
+                if name == "subject":
                     subject = header["value"]
-                    break
+                elif name == "from":
+                    sender = header["value"]
+                elif name == "to":
+                    receiver = header["value"]
+            if receiver is None:
+                receiver = email_address
+
             body_text = extract_body(message_detail.get("payload", {}))
             snippet = message_detail.get("snippet", "")
 
-            # 메시지 내용 로그로 출력
             print(f"[{email_address}] New Gmail message received!")
             print(f"Message ID: {msg_id}")
             print(f"Subject: {subject}")
+            print(f"From: {sender}")
+            print(f"To: {receiver}")
             print(f"Snippet: {snippet}")
             print(f"Body: {body_text}")
 
-            # 메시지 DB 저장
             db_message = DbMessage(
                 messenger="gmail",
-                sender_id=message_detail.get("payload", {}).get("headers", [{}])[0].get("value", ""),  # 필요시 개선
-                receiver_id=email_address,
+                user_id=user.cochat_id,
+                sender_id=sender,
+                receiver_id=receiver,
                 content=body_text,
                 category=None,
                 timestamp=datetime.utcnow()
@@ -281,6 +302,8 @@ async def gmail_push(request: Request, db: Session = Depends(get_db)):
                 "subject": subject,
                 "snippet": snippet,
                 "body": body_text,
+                "from": sender,
+                "to": receiver,
             })
     db.commit()
     return {"new_messages": messages}
