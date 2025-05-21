@@ -36,7 +36,7 @@ def extract_body(payload):
                     return result
     return None
 
-def login():
+def login(cochat_id: str):
     # Google OAuth2 로그인 페이지로 리다이렉트
     auth_url = (
         "https://accounts.google.com/o/oauth2/v2/auth"
@@ -46,13 +46,15 @@ def login():
         f"&scope={SCOPE}"
         f"&access_type=offline"
         f"&prompt=consent"
+        f"&state={cochat_id}"   # ← CoChat User 식별자 전달
     )
     return RedirectResponse(auth_url)
 
 
-def auth_callback(code: str, db: Session = Depends(get_db)):
+def auth_callback(code: str, state: str, db: Session = Depends(get_db)):
     # Authorization Code로 Access Token 교환
     token_url = "https://oauth2.googleapis.com/token"
+    cochat_id = state  # state에서 cochat_id 추출
     data = {
         "code": code,
         "client_id": GOOGLE_CLIENT_ID,
@@ -77,19 +79,19 @@ def auth_callback(code: str, db: Session = Depends(get_db)):
     email = userinfo["email"]
 
     # DbUser에서 사용자 조회 user가 없을 시 예외 처리
-    user = db.query(DbUser).filter(DbUser.email == email).first()
+    user = db.query(DbUser).filter(DbUser.cochat_id == cochat_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="Falied to find user")
     
     # DbMessengerAccount에 연동 정보 저장/업데이트
     messenger_account = db.query(DbMessengerAccount).filter(
-        DbMessengerAccount.user_id == user.id,
+        DbMessengerAccount.user_id == user.cochat_id,
         DbMessengerAccount.messenger == "gmail",
         DbMessengerAccount.messenger_user_id == email
     ).first()
     if not messenger_account:
         messenger_account = DbMessengerAccount(
-            user_id=user.id,
+            user_id=user.cochat_id,
             messenger="gmail",
             messenger_user_id=email,
             access_token=access_token,
@@ -130,12 +132,12 @@ def auth_callback(code: str, db: Session = Depends(get_db)):
     return JSONResponse({"msg": "Login successful", "email": email})
 
 
-def get_gmail_messages(email: str, db: Session = Depends(get_db)):
+def get_gmail_messages(cochat_id: str, db: Session = Depends(get_db)):
     """
     DB에서 해당 email(수신자)의 모든 메시지 목록을 반환
     """
     messages = db.query(DbMessage)\
-        .filter(DbMessage.receiver_id == email)\
+        .filter(DbMessage.receiver_id == cochat_id)\
         .order_by(DbMessage.timestamp.desc())\
         .all()
     if not messages:
@@ -156,12 +158,12 @@ def get_gmail_messages(email: str, db: Session = Depends(get_db)):
 
 
 
-def get_gmail_latest_messages(email: str, db: Session = Depends(get_db)):
+def get_gmail_latest_messages(cochat_id: str, db: Session = Depends(get_db)):
     """
     DB에서 해당 email(수신자)의 가장 최근 메시지 1개를 반환
     """
     msg = db.query(DbMessage)\
-        .filter(DbMessage.receiver_id == email)\
+        .filter(DbMessage.receiver_id == cochat_id)\
         .order_by(DbMessage.timestamp.desc())\
         .first()
     if not msg:
@@ -201,18 +203,18 @@ async def gmail_push(request: Request, db: Session = Depends(get_db)):
     history_id = payload["historyId"]
 
     # 사용자 및 연동 계정 조회
-    user = db.query(DbUser).filter(DbUser.email == email_address).first()
-    if not user:
-        print(f"No user found for {email_address}")
-        return {"status": "user not found"}
     messenger_account = db.query(DbMessengerAccount).filter(
-        DbMessengerAccount.user_id == user.id,
         DbMessengerAccount.messenger == "gmail",
         DbMessengerAccount.messenger_user_id == email_address
     ).first()
     if not messenger_account:
         print(f"No messenger account for {email_address}")
         return {"status": "messenger account not found"}
+    
+    user = db.query(DbUser).filter(DbUser.id == messenger_account.user_id).first()
+    if not user:
+      print(f"No user found for {email_address}")
+      return {"status": "user not found"}
 
     # access_token 가져오기
     access_token = messenger_account.access_token

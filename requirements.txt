@@ -10,4 +10,4 @@ passlib
 dotenv
 google-api-python-client
 google-auth
-email-validator
+psycopg2-binary
