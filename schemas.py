@@ -50,6 +50,7 @@ class MessageBase(BaseModel):
     messenger: str
     sender_id: str
     receiver_id: str
+    subject: str
     content: str
     category: Optional[str] = None
 
