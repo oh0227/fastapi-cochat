@@ -42,7 +42,7 @@ def get_message_by_id(
 
 # Read (Multiple)
 @router.get(
-    '/{cochat_id}',
+    '/cochat_id/{cochat_id}',
     response_model=List[MessageDisplay],
     responses={404: {"description": "No messages found"}}
 )
