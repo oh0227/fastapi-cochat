@@ -1,6 +1,9 @@
 import firebase_admin
 from firebase_admin import credentials, messaging
 import os
+from dotenv import load_dotenv
+
+load_dotenv() 
 
 # JSON 구성
 firebase_config = {
