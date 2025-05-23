@@ -16,10 +16,6 @@ router = APIRouter(
 def create_user(request: UserCreate, db: Session = Depends(get_db)):
     return db_user.create_user(db, request)
 
-@router.post("/register-fcm-token")
-def register_fcm_token(data: FCMTokenRegister, db: Session = Depends(get_db)):
-    return db_user.register_fcm_token(data, db)
-
 # Read all users
 @router.get('/', response_model=List[UserDisplay])
 def get_all_users(

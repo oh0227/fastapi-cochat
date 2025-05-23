@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from database.database import get_db
 from database.models import DbUser
 
-router = APIRouter()
+router = APIRouter(tags=['fcm'])
 
 class FCMTokenRegister(BaseModel):
     cochat_id: str

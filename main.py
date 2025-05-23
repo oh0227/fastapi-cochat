@@ -3,12 +3,14 @@ from routers import user
 from routers import gmail
 from routers import messenger
 from routers import message
+from routers import fcm_token
 from database import models
 from auth import authentication
 from database.database import engine
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
+app.include_router(fcm_token.router)
 app.include_router(message.router)
 app.include_router(messenger.router)
 app.include_router(gmail.router)
