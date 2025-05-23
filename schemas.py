@@ -35,11 +35,9 @@ class MessengerAccountBase(BaseModel):
 class MessengerAccountCreate(MessengerAccountBase):
     pass
 
-class MessengerAccountDisplay(BaseModel):
+class MessengerAccountDisplay(MessengerAccountBase):
     id: int
     user_id: str
-    messenger: str 
-    messenger_user_id: str
     timestamp: Optional[datetime] = None
     class Config:
         orm_mode = True

@@ -303,11 +303,14 @@ async def gmail_push(request: Request, db: Session = Depends(get_db)):
 
             # === FCM 푸시 알림 전송 ===
             if user.fcm_token:
-                send_fcm_push(
-                    user.fcm_token,
-                    title=f"새 메일: {subject or '(제목 없음)'}",
-                    body=snippet or body_text[:50] or "새 메일이 도착했습니다."
-                )
+                try:
+                    send_fcm_push(
+                        user.fcm_token,
+                        title=f"새 메일: {subject or '(제목 없음)'}",
+                        body=snippet or body_text[:50] or "새 메일이 도착했습니다."
+                    )
+                except Exception as e:
+                    print(f"FCM 알림 전송 실패: {e}")
             else:
                 print(f"User {user.cochat_id} has no FCM token.")
 
