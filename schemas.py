@@ -8,7 +8,6 @@ class UserBase(BaseModel):
     first_name: str
     last_name: str
     cochat_id: str
-    fcm_token: str
 
 class UserCreate(UserBase):
     password: str
