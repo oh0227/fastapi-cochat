@@ -1,0 +1,40 @@
+{
+  "project_info": {
+    "project_number": "49970901357",
+    "firebase_url": "https://cochat-cbec2-default-rtdb.firebaseio.com",
+    "project_id": "cochat-cbec2",
+    "storage_bucket": "cochat-cbec2.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:49970901357:android:1b756c681405b7ef3e6a64",
+        "android_client_info": {
+          "package_name": "com.oznwoo.cochat"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "49970901357-f5btv6tbp8guuqkv6o3ohae4j32eogot.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBZ5HGwusKmzhTkfa_EzkyB0YKKNTgqPBo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "49970901357-f5btv6tbp8guuqkv6o3ohae4j32eogot.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
