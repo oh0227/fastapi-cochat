@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from database.database import get_db
 from database.models import DbUser, DbMessengerAccount, DbMessage
 from datetime import datetime
+from fcm.fcm import send_fcm_push
 
 load_dotenv()
 
@@ -187,14 +188,12 @@ async def gmail_push(request: Request, db: Session = Depends(get_db)):
         print("PubSub raw body:", raw_body)
         print("PubSub parsed JSON:", body)
     except Exception:
-        # 바디가 비었거나 JSON이 아닐 때
         return {"status": "empty or invalid body"}
-    # Pub/Sub 메시지에서 data 추출 및 디코딩
     message_data = body.get("message", {}).get("data")
     if not message_data:
         print("No data field in Pub/Sub message")
         return {"status": "no data"}
-    decoded = base64.urlsafe_b64decode(message_data + '==').decode("utf-8")
+    decoded = base64.b64decode(message_data + '==').decode("utf-8")
     print("Decoded PubSub message data:", decoded)
     payload = json.loads(decoded)
     print("Decoded payload as dict:", payload)
@@ -202,7 +201,6 @@ async def gmail_push(request: Request, db: Session = Depends(get_db)):
     email_address = payload["emailAddress"]
     history_id = payload["historyId"]
 
-    # 사용자 및 연동 계정 조회
     messenger_account = db.query(DbMessengerAccount).filter(
         DbMessengerAccount.messenger == "gmail",
         DbMessengerAccount.messenger_user_id == email_address
@@ -211,22 +209,18 @@ async def gmail_push(request: Request, db: Session = Depends(get_db)):
         print(f"No messenger account for {email_address}")
         return {"status": "messenger account not found"}
 
-
     user = db.query(DbUser).filter(
         DbUser.cochat_id == messenger_account.user_id,
     ).first()
     if not user:
         print(f"No user for {messenger_account.messenger_user_id}")
         return {"status": "user account not found"}
-    
 
-    # access_token 가져오기
     access_token = messenger_account.access_token
     if not access_token:
         print(f"No access token for {email_address}")
         return {"status": "user not authenticated"}
 
-    # 계정별 historyId 관리 (DB에 저장)
     if not messenger_account.history_id:
         messenger_account.history_id = str(history_id)
         messenger_account.timestamp = datetime.utcnow()
@@ -260,7 +254,6 @@ async def gmail_push(request: Request, db: Session = Depends(get_db)):
                 continue
             message_detail = detail_resp.json()
 
-            # 헤더에서 subject, from, to 추출
             headers = message_detail.get("payload", {}).get("headers", [])
             subject = None
             sender = None
@@ -290,7 +283,7 @@ async def gmail_push(request: Request, db: Session = Depends(get_db)):
             db_message = DbMessage(
                 messenger="gmail",
                 user_id=user.cochat_id,
-                messenger_account_id = messenger_account.id,
+                messenger_account_id=messenger_account.id,
                 sender_id=sender,
                 receiver_id=receiver,
                 subject=subject,
@@ -307,5 +300,16 @@ async def gmail_push(request: Request, db: Session = Depends(get_db)):
                 "from": sender,
                 "to": receiver,
             })
+
+            # === FCM 푸시 알림 전송 ===
+            if user.fcm_token:
+                send_fcm_push(
+                    user.fcm_token,
+                    title=f"새 메일: {subject or '(제목 없음)'}",
+                    body=snippet or body_text[:50] or "새 메일이 도착했습니다."
+                )
+            else:
+                print(f"User {user.cochat_id} has no FCM token.")
+
     db.commit()
     return {"new_messages": messages}

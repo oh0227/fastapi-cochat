@@ -1,6 +1,6 @@
 from database.hash import Hash
 from sqlalchemy.orm.session import Session
-from schemas import UserBase, UserUpdate
+from schemas import UserBase, UserUpdate, FCMTokenRegister
 from database.models import DbUser
 from fastapi import HTTPException, status
 import datetime

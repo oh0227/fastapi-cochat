@@ -11,6 +11,7 @@ class DbUser(Base):
     last_name = Column(String)
     password = Column(String)
     timestamp = Column(DateTime)
+    fcm_token = Column(String, nullable=True)
     # 여러 메신저 계정과 연결
     messengers = relationship("DbMessengerAccount", back_populates="user")
     messages = relationship("DbMessage", back_populates="user")

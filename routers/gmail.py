@@ -1,5 +1,4 @@
 from fastapi import APIRouter, Request, Depends
-
 from googleapiclient.discovery import build
 from dotenv import load_dotenv
 from sqlalchemy.orm import Session
@@ -7,6 +6,7 @@ from database.database import get_db
 from database import db_gmail
 from schemas import UserDisplay
 from auth.oauth2 import get_current_user
+
 
 load_dotenv()
 

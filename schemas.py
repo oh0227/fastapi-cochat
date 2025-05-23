@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime
 
@@ -8,6 +8,7 @@ class UserBase(BaseModel):
     first_name: str
     last_name: str
     cochat_id: str
+    fcm_token: str
 
 class UserCreate(UserBase):
     password: str
@@ -67,3 +68,9 @@ class MessageDisplay(MessageBase):
 
 class UserWithMessengerAccounts(UserDisplay):
     messengers: List[MessengerAccountDisplay] = []
+
+# ===== FCM Token =====
+
+class FCMTokenRegister(BaseModel):
+    cochat_id: str
+    fcm_token: str
