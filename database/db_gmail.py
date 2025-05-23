@@ -181,7 +181,36 @@ def get_gmail_latest_messages(cochat_id: str, db: Session = Depends(get_db)):
 
 
 
+def refresh_access_token(refresh_token: str):
+    token_url = "https://oauth2.googleapis.com/token"
+    data = {
+        "client_id": GOOGLE_CLIENT_ID,
+        "client_secret": GOOGLE_CLIENT_SECRET,
+        "refresh_token": refresh_token,
+        "grant_type": "refresh_token"
+    }
+    response = requests.post(token_url, data=data)
+    if response.status_code == 200:
+        return response.json()
+    else:
+        raise HTTPException(status_code=401, detail="Failed to refresh token")
+    
+
 async def gmail_push(request: Request, db: Session = Depends(get_db)):
+    def refresh_access_token(refresh_token: str):
+        token_url = "https://oauth2.googleapis.com/token"
+        data = {
+            "client_id": GOOGLE_CLIENT_ID,
+            "client_secret": GOOGLE_CLIENT_SECRET,
+            "refresh_token": refresh_token,
+            "grant_type": "refresh_token"
+        }
+        response = requests.post(token_url, data=data)
+        if response.status_code == 200:
+            return response.json()
+        else:
+            raise Exception("Failed to refresh token")
+
     try:
         body = await request.json()
         raw_body = await request.body()
@@ -189,10 +218,12 @@ async def gmail_push(request: Request, db: Session = Depends(get_db)):
         print("PubSub parsed JSON:", body)
     except Exception:
         return {"status": "empty or invalid body"}
+
     message_data = body.get("message", {}).get("data")
     if not message_data:
         print("No data field in Pub/Sub message")
         return {"status": "no data"}
+
     decoded = base64.b64decode(message_data + '==').decode("utf-8")
     print("Decoded PubSub message data:", decoded)
     payload = json.loads(decoded)
@@ -217,9 +248,27 @@ async def gmail_push(request: Request, db: Session = Depends(get_db)):
         return {"status": "user account not found"}
 
     access_token = messenger_account.access_token
-    if not access_token:
-        print(f"No access token for {email_address}")
-        return {"status": "user not authenticated"}
+
+    # 1. access_token 유효성 검사
+    token_check = requests.get(
+        "https://www.googleapis.com/oauth2/v1/tokeninfo",
+        params={"access_token": access_token}
+    )
+
+    if token_check.status_code != 200:
+        print(f"Access token expired for {email_address}, refreshing...")
+        try:
+            token_data = refresh_access_token(messenger_account.refresh_token)
+            access_token = token_data["access_token"]
+            messenger_account.access_token = access_token
+            if "expires_in" in token_data:
+                messenger_account.token_expiry = datetime.utcnow()  # 실제 계산 시 timedelta 적용 가능
+            messenger_account.timestamp = datetime.utcnow()
+            db.commit()
+            print(f"Access token refreshed for {email_address}")
+        except Exception as e:
+            print(f"Token refresh failed: {e}")
+            return {"status": "token refresh failed"}
 
     if not messenger_account.history_id:
         messenger_account.history_id = str(history_id)
@@ -255,9 +304,7 @@ async def gmail_push(request: Request, db: Session = Depends(get_db)):
             message_detail = detail_resp.json()
 
             headers = message_detail.get("payload", {}).get("headers", [])
-            subject = None
-            sender = None
-            receiver = None
+            subject = sender = receiver = None
             for header in headers:
                 name = header["name"].lower()
                 if name == "subject":
@@ -292,6 +339,7 @@ async def gmail_push(request: Request, db: Session = Depends(get_db)):
                 timestamp=datetime.utcnow()
             )
             db.add(db_message)
+
             messages.append({
                 "id": msg_id,
                 "subject": subject,
@@ -301,7 +349,6 @@ async def gmail_push(request: Request, db: Session = Depends(get_db)):
                 "to": receiver,
             })
 
-            # === FCM 푸시 알림 전송 ===
             if user.fcm_token:
                 try:
                     send_fcm_push(
