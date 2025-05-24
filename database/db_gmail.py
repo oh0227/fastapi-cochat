@@ -249,7 +249,7 @@ async def gmail_push(request: Request, db: Session = Depends(get_db)):
 
     access_token = messenger_account.access_token
 
-    # 1. access_token 유효성 검사
+    # 토큰 유효성 검사
     token_check = requests.get(
         "https://www.googleapis.com/oauth2/v1/tokeninfo",
         params={"access_token": access_token}
@@ -262,7 +262,7 @@ async def gmail_push(request: Request, db: Session = Depends(get_db)):
             access_token = token_data["access_token"]
             messenger_account.access_token = access_token
             if "expires_in" in token_data:
-                messenger_account.token_expiry = datetime.utcnow()  # 실제 계산 시 timedelta 적용 가능
+                messenger_account.token_expiry = datetime.utcnow()
             messenger_account.timestamp = datetime.utcnow()
             db.commit()
             print(f"Access token refreshed for {email_address}")
@@ -303,9 +303,22 @@ async def gmail_push(request: Request, db: Session = Depends(get_db)):
                 continue
             message_detail = detail_resp.json()
 
-            headers = message_detail.get("payload", {}).get("headers", [])
+            # 🔍 문제 1: DRAFT 필터링
+            if "DRAFT" in message_detail.get("labelIds", []):
+                print("DRAFT 메시지는 무시")
+                continue
+
+            # 🔍 문제 2: 중복 체크 by Gmail message_id
+            existing = db.query(DbMessage).filter(
+                DbMessage.gmail_message_id == msg_id
+            ).first()
+            if existing:
+                print("이미 저장된 메일입니다, 중복 제거")
+                continue
+
+            headers_list = message_detail.get("payload", {}).get("headers", [])
             subject = sender = receiver = None
-            for header in headers:
+            for header in headers_list:
                 name = header["name"].lower()
                 if name == "subject":
                     subject = header["value"]
@@ -328,6 +341,7 @@ async def gmail_push(request: Request, db: Session = Depends(get_db)):
             print(f"Body: {body_text}")
 
             db_message = DbMessage(
+                gmail_message_id=msg_id,
                 messenger="gmail",
                 user_id=user.cochat_id,
                 messenger_account_id=messenger_account.id,

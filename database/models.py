@@ -37,6 +37,7 @@ class DbMessage(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(String, ForeignKey('users.cochat_id'))
     messenger_account_id = Column(Integer, ForeignKey('messenger_accounts.id'))  # id 참조
+    gmail_message_id = Column(String, unique=True, nullable=True)
     messenger = Column(String)
     sender_id = Column(String)
     receiver_id = Column(String)  # 실제 수신자 주소 (예: 이메일)
