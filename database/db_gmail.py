@@ -10,8 +10,10 @@ from dotenv import load_dotenv
 from sqlalchemy.orm import Session
 from database.database import get_db
 from database.models import DbUser, DbMessengerAccount, DbMessage
+from schemas import MessageBase
 from datetime import datetime
 from fcm.fcm import send_fcm_push
+from rag.rag_module import run_rag_pipeline
 
 load_dotenv()
 
@@ -329,17 +331,31 @@ async def gmail_push(request: Request, db: Session = Depends(get_db)):
             if receiver is None:
                 receiver = email_address
 
+            # 본문 파싱
             body_text = extract_body(message_detail.get("payload", {}))
             snippet = message_detail.get("snippet", "")
 
-            print(f"[{email_address}] New Gmail message received!")
-            print(f"Message ID: {msg_id}")
-            print(f"Subject: {subject}")
-            print(f"From: {sender}")
-            print(f"To: {receiver}")
-            print(f"Snippet: {snippet}")
-            print(f"Body: {body_text}")
+            try:
+                clean_json_content = json.dumps({"content": body_text}, ensure_ascii=False, indent=2)
+            except TypeError as e:
+                print(f"❗ JSON 직렬화 실패: {e}")
 
+            # 🧠 RAG 처리
+            rag_result = run_rag_pipeline(MessageBase(
+                messenger="gmail",
+                sender_id=sender,
+                receiver_id=receiver,
+                subject=subject,
+                content=clean_json_content
+            ))
+
+            category = rag_result.get("category")
+            keywords = rag_result.get("keywords", [])
+
+            print(f"🔑 추출된 키워드: {keywords}")
+            print(f"📂 추정 카테고리: {category}")
+
+            # DB 저장
             db_message = DbMessage(
                 gmail_message_id=msg_id,
                 messenger="gmail",
@@ -349,20 +365,12 @@ async def gmail_push(request: Request, db: Session = Depends(get_db)):
                 receiver_id=receiver,
                 subject=subject,
                 content=body_text,
-                category=None,
+                category=category,  # 👈 카테고리 반영
                 timestamp=datetime.utcnow()
             )
             db.add(db_message)
 
-            messages.append({
-                "id": msg_id,
-                "subject": subject,
-                "snippet": snippet,
-                "body": body_text,
-                "from": sender,
-                "to": receiver,
-            })
-
+            # FCM 푸시 알림
             if user.fcm_token:
                 try:
                     send_fcm_push(
