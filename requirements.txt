@@ -13,26 +13,3 @@ google-api-python-client
 google-auth
 psycopg2-binary
 firebase-admin
-
-# LangChain & LLM 관련
-langchain
-langchain-core
-langchain-community
-langchain-huggingface
-langchain-unstructured
-openai
-
-# Embedding 및 모델 관련
-sentence-transformers
-transformers
-tokenizers
-torch
-chromadb
-
-# 문서 처리용
-unstructured
-
-duckduckgo_search
-newspaper3k
-lxml[html_clean]
-langchain-chroma
