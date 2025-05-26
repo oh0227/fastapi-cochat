@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, UniqueConstraint
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, UniqueConstraint, JSON
 from sqlalchemy.orm import relationship
 from database.database import Base
 
@@ -44,6 +44,7 @@ class DbMessage(Base):
     subject = Column(String)
     content = Column(String)
     category = Column(String)
+    embedding_vector = Column(JSON) 
     timestamp = Column(DateTime)
     user = relationship("DbUser", back_populates="messages")
     messengers = relationship("DbMessengerAccount", back_populates="messages")

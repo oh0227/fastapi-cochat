@@ -330,7 +330,6 @@ async def gmail_push(request: Request, db: Session = Depends(get_db)):
 
             # 기본값 초기화
             category = None
-            keywords = []
             rag_result = {"category": None, "keywords": []}
 
             if llm_url:
@@ -351,12 +350,16 @@ async def gmail_push(request: Request, db: Session = Depends(get_db)):
                         rag_result = resp.json().get("result", {})
                         print("Colab API 응답 성공:", rag_result)
                     else:
-                        print(f"Colab LLM API 호출 실패: {resp.status_code} - {resp.text}")
-                        
+                        print(f"Colab LLM API 호출 실패: {resp.status_code} - {resp.text}")       
                 except Exception as e:
                     print(f"Colab LLM API 호출 중 에러: {str(e)}")
             else:
                 print("⚠️ LLM(Colab) URL이 등록되어 있지 않습니다. 기본값 사용")
+
+
+            # 안전하게 값 추출
+            category = rag_result.get("category")
+            embedding_vector = rag_result.get("embedding_vector")
 
             # DB 저장
             db_message = DbMessage(
@@ -368,7 +371,8 @@ async def gmail_push(request: Request, db: Session = Depends(get_db)):
                 receiver_id=receiver,
                 subject=subject,
                 content=body_text,
-                category=category,  # 👈 카테고리 반영
+                category=category,
+                embedding_vector=embedding_vector,
                 timestamp=datetime.utcnow()
             )
             db.add(db_message)
