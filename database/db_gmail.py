@@ -330,6 +330,10 @@ async def gmail_push(request: Request, db: Session = Depends(get_db)):
                 print("LLM(Colab) URL이 등록되어 있지 않습니다.")
                 rag_result = {"category": None, "keywords": []}
             else:
+
+                # try 블럭 바깥에서 미리 초기화
+                category = None
+                keywords = []
                 try:
                     # Colab API에 POST 요청
                     api_url = f"{llm_url}/analyze"
