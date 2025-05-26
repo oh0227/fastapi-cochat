@@ -36,11 +36,14 @@ app.add_middleware(
   allow_headers=['*']
 )
 
-
+@app.get("/get_llm_url")
+def get_llm_url():
+    return {"llm_url": app.state.llm_url}
 
 @app.post("/set_llm_url")
 def set_llm_url(data: dict):
     app.state.llm_url = data["url"]
+    print(app.state.llm_url)
     return {"status": "ok"}
 
 @app.post("/llm")

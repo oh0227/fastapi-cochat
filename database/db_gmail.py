@@ -326,40 +326,37 @@ async def gmail_push(request: Request, db: Session = Depends(get_db)):
 
             # 🧠 RAG 처리 (외부 Colab API 호출)
             llm_url = request.app.state.llm_url  # 최신 ngrok URL
-            if not llm_url:
-                print("LLM(Colab) URL이 등록되어 있지 않습니다.")
-                rag_result = {"category": None, "keywords": []}
-            else:
+            print("현재 LLM URL:", llm_url)
 
-                # try 블럭 바깥에서 미리 초기화
-                category = None
-                keywords = []
+            # 기본값 초기화
+            category = None
+            keywords = []
+            rag_result = {"category": None, "keywords": []}
+
+            if llm_url:
                 try:
                     # Colab API에 POST 요청
                     api_url = f"{llm_url}/analyze"
-                    # MessageBase 객체를 dict로 변환
                     message_payload = {
                         "messenger": "gmail",
                         "sender_id": sender,
                         "receiver_id": receiver,
                         "subject": subject,
                         "content": clean_json_content
-                    }                    
+                    }
+                    print("Colab API 요청 전송:", api_url)
                     resp = requests.post(api_url, json=message_payload, timeout=30)
+                    
                     if resp.status_code == 200:
                         rag_result = resp.json().get("result", {})
+                        print("Colab API 응답 성공:", rag_result)
                     else:
-                        print(f"Colab LLM API 호출 실패: {resp.text}")
-                        rag_result = {"category": None, "keywords": []}
+                        print(f"Colab LLM API 호출 실패: {resp.status_code} - {resp.text}")
+                        
                 except Exception as e:
-                    print(f"Colab LLM API 호출 중 에러: {e}")
-                    rag_result = {"category": None, "keywords": []}
-
-                    category = rag_result.get("category")
-                    keywords = rag_result.get("keywords", [])
-
-                    print(f"🔑 추출된 키워드: {keywords}")
-                    print(f"📂 추정 카테고리: {category}")
+                    print(f"Colab LLM API 호출 중 에러: {str(e)}")
+            else:
+                print("⚠️ LLM(Colab) URL이 등록되어 있지 않습니다. 기본값 사용")
 
             # DB 저장
             db_message = DbMessage(
