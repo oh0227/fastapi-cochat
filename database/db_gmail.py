@@ -197,20 +197,6 @@ def refresh_access_token(refresh_token: str):
     
 
 async def gmail_push(request: Request, db: Session = Depends(get_db)):
-    def refresh_access_token(refresh_token: str):
-        token_url = "https://oauth2.googleapis.com/token"
-        data = {
-            "client_id": GOOGLE_CLIENT_ID,
-            "client_secret": GOOGLE_CLIENT_SECRET,
-            "refresh_token": refresh_token,
-            "grant_type": "refresh_token"
-        }
-        response = requests.post(token_url, data=data)
-        if response.status_code == 200:
-            return response.json()
-        else:
-            raise Exception("Failed to refresh token")
-
     try:
         body = await request.json()
         raw_body = await request.body()
@@ -354,8 +340,7 @@ async def gmail_push(request: Request, db: Session = Depends(get_db)):
                         "receiver_id": receiver,
                         "subject": subject,
                         "content": clean_json_content
-                    }
-                    import requests
+                    }                    
                     resp = requests.post(api_url, json=message_payload, timeout=30)
                     if resp.status_code == 200:
                         rag_result = resp.json().get("result", {})
