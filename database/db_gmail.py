@@ -200,8 +200,6 @@ async def gmail_push(request: Request, db: Session = Depends(get_db)):
     try:
         body = await request.json()
         raw_body = await request.body()
-        print("PubSub raw body:", raw_body)
-        print("PubSub parsed JSON:", body)
     except Exception:
         return {"status": "empty or invalid body"}
 
@@ -211,9 +209,7 @@ async def gmail_push(request: Request, db: Session = Depends(get_db)):
         return {"status": "no data"}
 
     decoded = base64.b64decode(message_data + '==').decode("utf-8")
-    print("Decoded PubSub message data:", decoded)
     payload = json.loads(decoded)
-    print("Decoded payload as dict:", payload)
 
     email_address = payload["emailAddress"]
     history_id = payload["historyId"]
@@ -289,9 +285,15 @@ async def gmail_push(request: Request, db: Session = Depends(get_db)):
                 continue
             message_detail = detail_resp.json()
 
+            label_ids = message_detail.get("labelIds", [])
+
             # 🔍 문제 1: DRAFT 필터링
-            if "DRAFT" in message_detail.get("labelIds", []):
+            if "DRAFT" in label_ids:
                 print("DRAFT 메시지는 무시")
+                continue
+
+            if "SENT" in label_ids and "INBOX" not in label_ids:
+                print("내가 보낸 메일입니다 — 푸시 생략")
                 continue
 
             # 🔍 문제 2: 중복 체크 by Gmail message_id
@@ -317,7 +319,6 @@ async def gmail_push(request: Request, db: Session = Depends(get_db)):
 
             # 본문 파싱
             body_text = extract_body(message_detail.get("payload", {}))
-            snippet = message_detail.get("snippet", "")
 
             try:
                 clean_json_content = json.dumps({"content": body_text}, ensure_ascii=False, indent=2)
@@ -330,36 +331,53 @@ async def gmail_push(request: Request, db: Session = Depends(get_db)):
 
             # 기본값 초기화
             category = None
-            rag_result = {"category": None, "keywords": []}
+            keywords = []
+            embedding_vector = []
+            summary = ""
 
             if llm_url:
                 try:
-                    # Colab API에 POST 요청
-                    api_url = f"{llm_url}/analyze"
+                    # MessageBase 스키마에 맞게 요청 본문 구성
                     message_payload = {
                         "messenger": "gmail",
                         "sender_id": sender,
                         "receiver_id": receiver,
                         "subject": subject,
-                        "content": clean_json_content
+                        "content": clean_json_content,
+                        # category와 embedding_vector는 Colab에서 생성할 값이므로 요청 시 제외
                     }
-                    print("Colab API 요청 전송:", api_url)
-                    resp = requests.post(api_url, json=message_payload, timeout=30)
+                    print("Colab API 요청 데이터:", json.dumps(message_payload, indent=2))
                     
+                    # Colab API 호출
+                    api_url = f"{llm_url}/analyze"
+                    resp = requests.post(
+                        api_url,
+                        json=message_payload,
+                        headers={"Content-Type": "application/json"},
+                        timeout=30
+                    )
+                    
+                    # 응답 처리
                     if resp.status_code == 200:
-                        rag_result = resp.json().get("result", {})
-                        print("Colab API 응답 성공:", rag_result)
+                        try:
+                            response_data = resp.json()
+                            print("Colab API 응답 성공:", json.dumps(response_data, indent=2))
+                            
+                            # 결과 추출 (안전한 get 메소드 사용)
+                            category = response_data.get("category", "others")
+                            keywords = response_data.get("keywords", [])
+                            embedding_vector = response_data.get("embedding_vector", [])
+                            summary = response_data.get("summary", "")
+                            
+                        except json.JSONDecodeError as e:
+                            print("❗ JSON 파싱 실패:", e)
+                            print("원본 응답 텍스트:", resp.text)
                     else:
                         print(f"Colab LLM API 호출 실패: {resp.status_code} - {resp.text}")       
                 except Exception as e:
                     print(f"Colab LLM API 호출 중 에러: {str(e)}")
             else:
                 print("⚠️ LLM(Colab) URL이 등록되어 있지 않습니다. 기본값 사용")
-
-
-            # 안전하게 값 추출
-            category = rag_result.get("category")
-            embedding_vector = rag_result.get("embedding_vector")
 
             # DB 저장
             db_message = DbMessage(
@@ -371,7 +389,7 @@ async def gmail_push(request: Request, db: Session = Depends(get_db)):
                 receiver_id=receiver,
                 subject=subject,
                 content=body_text,
-                category=category,
+                category=category or "others",  # 기본값 처리
                 embedding_vector=embedding_vector,
                 timestamp=datetime.utcnow()
             )
@@ -383,7 +401,7 @@ async def gmail_push(request: Request, db: Session = Depends(get_db)):
                     send_fcm_push(
                         user.fcm_token,
                         title=f"새 메일: {subject or '(제목 없음)'}",
-                        body=snippet or body_text[:50] or "새 메일이 도착했습니다."
+                        body=summary or body_text[:50] or "새 메일이 도착했습니다."
                     )
                 except Exception as e:
                     print(f"FCM 알림 전송 실패: {e}")
