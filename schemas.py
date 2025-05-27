@@ -50,6 +50,7 @@ class MessageBase(BaseModel):
     receiver_id: str
     subject: str
     content: str
+    embedding_vector: Optional[List[float]] = None  
     category: Optional[str] = None
 
 class MessageCreate(MessageBase):
