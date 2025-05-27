@@ -354,7 +354,7 @@ async def gmail_push(request: Request, db: Session = Depends(get_db)):
                         api_url,
                         json=message_payload,
                         headers={"Content-Type": "application/json"},
-                        timeout=30
+                        timeout=(10, 120)
                     )
                     
                     # 응답 처리
