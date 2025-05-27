@@ -343,6 +343,7 @@ async def gmail_push(request: Request, db: Session = Depends(get_db)):
                         "receiver_id": receiver,
                         "subject": subject,
                         "content": clean_json_content,
+                        "cochat_id": user.cochat_id
                         # category와 embedding_vector는 Colab에서 생성할 값이므로 요청 시 제외
                     }
                     print("Colab API 요청 데이터:", json.dumps(message_payload, indent=2))
