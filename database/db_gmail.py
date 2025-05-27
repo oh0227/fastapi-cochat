@@ -331,7 +331,6 @@ async def gmail_push(request: Request, db: Session = Depends(get_db)):
 
             # 기본값 초기화
             category = None
-            keywords = []
             embedding_vector = []
             summary = ""
 
@@ -363,15 +362,18 @@ async def gmail_push(request: Request, db: Session = Depends(get_db)):
                             response_data = resp.json()
                             print("Colab API 응답 성공:", json.dumps(response_data, indent=2))
                             
-                            # 결과 추출 (안전한 get 메소드 사용)
-                            category = response_data.get("category", "others")
-                            keywords = response_data.get("keywords", [])
-                            embedding_vector = response_data.get("embedding_vector", [])
-                            summary = response_data.get("summary", "")
+                            result = response_data.get("result", {})
+
+                            # 결과 추출
+                            category = result.get("category", "others")
+                            embedding_vector = result.get("embedding_vector", [])
+                            summary = result.get("summary", "")
                             
+                            print("📦 category:", category)
+                            print("📦 embedding_vector 길이:", len(embedding_vector))
+                        
                         except json.JSONDecodeError as e:
                             print("❗ JSON 파싱 실패:", e)
-                            print("원본 응답 텍스트:", resp.text)
                     else:
                         print(f"Colab LLM API 호출 실패: {resp.status_code} - {resp.text}")       
                 except Exception as e:
