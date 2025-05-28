@@ -1,9 +1,11 @@
 from database.hash import Hash
+from typing import List
 from sqlalchemy.orm.session import Session
-from schemas import UserBase, UserUpdate, FCMTokenRegister
+from schemas import UserBase, UserUpdate
 from database.models import DbUser
 from fastapi import HTTPException, status
 import datetime
+from sentence_transformers import SentenceTransformer
 
 def create_user(db: Session, request: UserBase):
   new_user = DbUser(
@@ -49,6 +51,21 @@ def update_user(db: Session, id: int, request: UserUpdate):
   })
   db.commit()
   return 'ok'
+
+
+
+bert = SentenceTransformer("all-MiniLM-L6-v2")  # 모델 크기 Render에 맞춰 조절
+
+def set_user_preferences(db: Session, cochat_id: str, preferences: List[str]):
+    user = db.query(DbUser).filter(DbUser.cochat_id == cochat_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    joined = ", ".join(preferences)
+    embedding = bert.encode(joined).tolist()
+    user.preference_vector = embedding
+    db.commit()
+    return {"status": "success", "vector_length": len(embedding)}
 
 
 def delete_user(db: Session, id: int):

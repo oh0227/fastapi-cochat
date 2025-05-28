@@ -22,6 +22,10 @@ class UserDisplay(UserBase):
     class Config:
         orm_mode = True
 
+class UserPreference(BaseModel):
+    cochat_id: str
+    preferences: List[str]
+
 # ===== 메신저 연동 계정 관련 =====
 
 class MessengerAccountBase(BaseModel):
