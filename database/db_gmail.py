@@ -330,59 +330,56 @@ async def gmail_push(request: Request, db: Session = Depends(get_db)):
             print("현재 LLM URL:", llm_url)
 
             # 기본값 초기화
+            summary = ""
+            recommended = True  # 기본값은 true
             category = None
             embedding_vector = []
-            summary = ""
 
             if llm_url:
                 try:
-                    # MessageBase 스키마에 맞게 요청 본문 구성
                     message_payload = {
-                        "messenger": "gmail",
+                        "cochat_id": user.cochat_id,
                         "sender_id": sender,
                         "receiver_id": receiver,
                         "subject": subject,
-                        "content": clean_json_content,
-                        "cochat_id": user.cochat_id
-                        # category와 embedding_vector는 Colab에서 생성할 값이므로 요청 시 제외
+                        "content": body_text,
                     }
-                    print("Colab API 요청 데이터:", json.dumps(message_payload, indent=2))
-                    
-                    # Colab API 호출
-                    api_url = f"{llm_url}/analyze"
+                    print("Colab API 요청 데이터:", json.dumps(message_payload, indent=2, ensure_ascii=False))
+
+                    api_url = f"{llm_url}/analyze_and_filter"
                     resp = requests.post(
                         api_url,
                         json=message_payload,
                         headers={"Content-Type": "application/json"},
                         timeout=(10, 120)
                     )
-                    
-                    # 응답 처리
+
                     if resp.status_code == 200:
                         try:
                             response_data = resp.json()
-                            print("Colab API 응답 성공:", json.dumps(response_data, indent=2))
-                            
+                            print("Colab API 응답 성공:", json.dumps(response_data, indent=2, ensure_ascii=False))
+                            # 📌 Colab 응답에서 필드 추출
                             result = response_data.get("result", {})
-
-                            # 결과 추출
+                            recommended = result.get("recommended", True)  # 기본값은 True
                             category = result.get("category", "others")
                             embedding_vector = result.get("embedding_vector", [])
                             summary = result.get("summary", "")
-                            
-                            print("📦 category:", category)
-                            print("📦 embedding_vector 길이:", len(embedding_vector))
-                        
+
+
+                            if not recommended:
+                                print("❌ Colab이 이 메시지를 추천하지 않았으므로 저장/푸시 생략")
+                                continue
+
                         except json.JSONDecodeError as e:
                             print("❗ JSON 파싱 실패:", e)
                     else:
-                        print(f"Colab LLM API 호출 실패: {resp.status_code} - {resp.text}")       
+                        print(f"Colab LLM API 호출 실패: {resp.status_code} - {resp.text}")
                 except Exception as e:
                     print(f"Colab LLM API 호출 중 에러: {str(e)}")
             else:
                 print("⚠️ LLM(Colab) URL이 등록되어 있지 않습니다. 기본값 사용")
 
-            # DB 저장
+            # ✅ 추천된 경우에만 DB 저장 및 FCM 푸시
             db_message = DbMessage(
                 gmail_message_id=msg_id,
                 messenger="gmail",
@@ -392,13 +389,12 @@ async def gmail_push(request: Request, db: Session = Depends(get_db)):
                 receiver_id=receiver,
                 subject=subject,
                 content=body_text,
-                category=category or "others",  # 기본값 처리
-                embedding_vector=embedding_vector,
+                category=category,  # 현재 카테고리 없음
+                embedding_vector=embedding_vector,  # 현재 벡터 없음
                 timestamp=datetime.utcnow()
             )
             db.add(db_message)
 
-            # FCM 푸시 알림
             if user.fcm_token:
                 try:
                     send_fcm_push(
@@ -410,6 +406,7 @@ async def gmail_push(request: Request, db: Session = Depends(get_db)):
                     print(f"FCM 알림 전송 실패: {e}")
             else:
                 print(f"User {user.cochat_id} has no FCM token.")
+
 
     db.commit()
     return {"new_messages": messages}

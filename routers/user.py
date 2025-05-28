@@ -1,5 +1,5 @@
 from typing import List
-from schemas import UserBase, UserCreate, UserUpdate, UserDisplay, UserPreference
+from schemas import UserBase, UserCreate, UserUpdate, UserDisplay
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from database.database import get_db
@@ -42,14 +42,6 @@ def update_user(
     current_user: UserDisplay = Depends(get_current_user)
 ):
     return db_user.update_user(db, id, request)
-
-
-@router.post('/preferences')
-def save_user_preferences(
-    request: UserPreference,
-    db: Session = Depends(get_db)
-):
-    return db_user.set_user_preferences(db, request.cochat_id, request.preferences)
 
 # Delete user
 @router.delete('/{id}', response_model=dict)
