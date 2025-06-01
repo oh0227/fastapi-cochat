@@ -1,5 +1,11 @@
 steps:
   - name: "gcr.io/cloud-builders/docker"
-    args: ["build", "-t", "gcr.io/$PROJECT_ID/myimage", "."]
+    args:
+      [
+        "build",
+        "-t",
+        "gcr.io/cloudrun/placeholder@sha256:3fcbe323e51b556d5aa247a301372ac7094adef58cda80bcf8056cf5fcafc976",
+        ".",
+      ]
 options:
   logging: CLOUD_LOGGING_ONLY
