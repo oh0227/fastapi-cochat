@@ -3,8 +3,9 @@ from typing import List
 from sqlalchemy.orm.session import Session
 from schemas import UserBase, UserUpdate
 from database.models import DbUser
-from fastapi import HTTPException, status
+from fastapi import HTTPException, status, Request
 import datetime
+import requests
 
 def create_user(db: Session, request: UserBase):
   new_user = DbUser(
@@ -50,6 +51,41 @@ def update_user(db: Session, id: int, request: UserUpdate):
   })
   db.commit()
   return 'ok'
+
+
+def set_user_preferences(request: Request, db: Session, cochat_id: str, preferences: List[str]):
+    llm_url = request.app.state.llm_url  # 최신 ngrok URL
+    user = db.query(DbUser).filter(DbUser.cochat_id == cochat_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # 선호 항목을 문자열로 결합
+    joined = ", ".join(preferences)
+
+    # 외부 LLM API 호출 준비
+    api_url = f"{llm_url}/preference/create"  # 적절한 엔드포인트로 수정하세요
+    message_payload = {"text": joined}
+
+    try:
+        resp = requests.post(
+            api_url,
+            json=message_payload,
+            headers={"Content-Type": "application/json"},
+            timeout=(10, 120)
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        embedding = data.get("embedding")
+        if not embedding:
+            raise HTTPException(status_code=500, detail="No embedding returned from LLM")
+    except requests.RequestException as e:
+        raise HTTPException(status_code=502, detail=f"Embedding server error: {str(e)}")
+
+    # DB에 벡터 저장
+    user.preference_vector = embedding
+    db.commit()
+
+    return {"status": "success", "vector_length": len(embedding)}
 
 
 def delete_user(db: Session, id: int):
