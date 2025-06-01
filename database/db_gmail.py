@@ -343,6 +343,7 @@ async def gmail_push(request: Request, db: Session = Depends(get_db)):
                         "receiver_id": receiver,
                         "subject": subject,
                         "content": body_text,
+                        "preference_vector": user.preference_vector 
                     }
                     print("Colab API 요청 데이터:", json.dumps(message_payload, indent=2, ensure_ascii=False))
 
@@ -359,16 +360,11 @@ async def gmail_push(request: Request, db: Session = Depends(get_db)):
                             response_data = resp.json()
                             print("Colab API 응답 성공:", json.dumps(response_data, indent=2, ensure_ascii=False))
                             # 📌 Colab 응답에서 필드 추출
-                            result = response_data.get("result", {})
-                            recommended = result.get("recommended", True)  # 기본값은 True
-                            category = result.get("category", "others")
-                            embedding_vector = result.get("embedding_vector", [])
-                            summary = result.get("summary", "")
+                            recommended = response_data.get("recommended", True)  # 기본값은 True
+                            category = response_data.get("category", "others")
+                            embedding_vector = response_data.get("embedding_vector", [])
+                            summary = response_data.get("summary", "")
 
-
-                            if not recommended:
-                                print("❌ Colab이 이 메시지를 추천하지 않았으므로 저장/푸시 생략")
-                                continue
 
                         except json.JSONDecodeError as e:
                             print("❗ JSON 파싱 실패:", e)
@@ -389,13 +385,13 @@ async def gmail_push(request: Request, db: Session = Depends(get_db)):
                 receiver_id=receiver,
                 subject=subject,
                 content=body_text,
-                category=category,  # 현재 카테고리 없음
-                embedding_vector=embedding_vector,  # 현재 벡터 없음
+                category=category, 
+                embedding_vector=embedding_vector, 
                 timestamp=datetime.utcnow()
             )
             db.add(db_message)
 
-            if user.fcm_token:
+            if recommended and user.fcm_token:
                 try:
                     send_fcm_push(
                         user.fcm_token,
