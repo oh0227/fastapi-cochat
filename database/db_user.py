@@ -6,6 +6,9 @@ from database.models import DbUser
 from fastapi import HTTPException, status, Request
 import datetime
 import requests
+import os
+
+NGROK_URL = os.getenv("NGROK_URL")
 
 def create_user(db: Session, request: UserBase):
   new_user = DbUser(
@@ -54,7 +57,6 @@ def update_user(db: Session, id: int, request: UserUpdate):
 
 
 def set_user_preferences(request: Request, db: Session, cochat_id: str, preferences: List[str]):
-    llm_url = request.app.state.llm_url  # 최신 ngrok URL
     user = db.query(DbUser).filter(DbUser.cochat_id == cochat_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -63,7 +65,7 @@ def set_user_preferences(request: Request, db: Session, cochat_id: str, preferen
     joined = ", ".join(preferences)
 
     # 외부 LLM API 호출 준비
-    api_url = f"{llm_url}/preference/create"  # 적절한 엔드포인트로 수정하세요
+    api_url = f"{NGROK_URL}/preference/create"  # 적절한 엔드포인트로 수정하세요
     message_payload = {"text": joined}
 
     try:

@@ -11,7 +11,6 @@ from fastapi.middleware.cors import CORSMiddleware
 import os
 
 app = FastAPI()
-app.state.llm_url = ""
 
 app.include_router(fcm_token.router)
 app.include_router(message.router)
@@ -35,20 +34,3 @@ app.add_middleware(
   allow_methods=['*'],
   allow_headers=['*']
 )
-
-@app.get("/get_llm_url")
-def get_llm_url():
-    return {"llm_url": app.state.llm_url}
-
-@app.post("/set_llm_url")
-def set_llm_url(data: dict):
-    app.state.llm_url = data["url"]
-    print(app.state.llm_url)
-    return {"status": "ok"}
-
-@app.post("/llm")
-def call_llm(prompt: str):
-    # llm_url을 사용해 Colab의 LLM에 요청
-    import requests
-    resp = requests.post(f"{app.state.llm_url}/generate", json={"prompt": prompt})
-    return resp.json()

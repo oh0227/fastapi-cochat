@@ -21,6 +21,7 @@ GOOGLE_PROJECT_ID = os.getenv("GOOGLE_PROJECT_ID")
 PUBSUB_TOPIC_NAME = os.getenv("PUBSUB_TOPIC_NAME")
 REDIRECT_URI = os.getenv("REDIRECT_URI")
 SCOPE = "https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/userinfo.email"
+NGROK_URL = os.getenv("NGROK_URL")
 
 def extract_body(payload):
     if "body" in payload and "data" in payload["body"]:
@@ -326,8 +327,6 @@ async def gmail_push(request: Request, db: Session = Depends(get_db)):
                 print(f"❗ JSON 직렬화 실패: {e}")
 
             # 🧠 RAG 처리 (외부 Colab API 호출)
-            llm_url = request.app.state.llm_url  # 최신 ngrok URL
-            print("현재 LLM URL:", llm_url)
 
             # 기본값 초기화
             summary = ""
@@ -335,45 +334,44 @@ async def gmail_push(request: Request, db: Session = Depends(get_db)):
             category = None
             embedding_vector = []
 
-            if llm_url:
-                try:
-                    message_payload = {
-                        "cochat_id": user.cochat_id,
-                        "sender_id": sender,
-                        "receiver_id": receiver,
-                        "subject": subject,
-                        "content": body_text,
-                        "preference_vector": user.preference_vector 
-                    }
-                    print("Colab API 요청 데이터:", json.dumps(message_payload, indent=2, ensure_ascii=False))
 
-                    api_url = f"{llm_url}/analyze_and_filter"
-                    resp = requests.post(
-                        api_url,
-                        json=message_payload,
-                        headers={"Content-Type": "application/json"},
-                        timeout=(10, 120)
-                    )
+            try:
+                message_payload = {
+                    "cochat_id": user.cochat_id,
+                    "sender_id": sender,
+                    "receiver_id": receiver,
+                    "subject": subject,
+                    "content": body_text,
+                    "preference_vector": user.preference_vector 
+                }
+                print("Colab API 요청 데이터:", json.dumps(message_payload, indent=2, ensure_ascii=False))
 
-                    if resp.status_code == 200:
-                        try:
-                            response_data = resp.json()
-                            print("Colab API 응답 성공:", json.dumps(response_data, indent=2, ensure_ascii=False))
-                            # 📌 Colab 응답에서 필드 추출
-                            recommended = response_data.get("recommended", True)  # 기본값은 True
-                            category = response_data.get("category", "others")
-                            embedding_vector = response_data.get("embedding_vector", [])
-                            summary = response_data.get("summary", "")
+                api_url = f"{NGROK_URL}/analyze_and_filter"
+                resp = requests.post(
+                    api_url,
+                    json=message_payload,
+                    headers={"Content-Type": "application/json"},
+                    timeout=(10, 120)
+                )
+
+                if resp.status_code == 200:
+                    try:
+                        response_data = resp.json()
+                        print("Colab API 응답 성공:", json.dumps(response_data, indent=2, ensure_ascii=False))
+                        # 📌 Colab 응답에서 필드 추출
+                        recommended = response_data.get("recommended", True)  # 기본값은 True
+                        category = response_data.get("category", "others")
+                        embedding_vector = response_data.get("embedding_vector", [])
+                        summary = response_data.get("summary", "")
 
 
-                        except json.JSONDecodeError as e:
-                            print("❗ JSON 파싱 실패:", e)
-                    else:
-                        print(f"Colab LLM API 호출 실패: {resp.status_code} - {resp.text}")
-                except Exception as e:
-                    print(f"Colab LLM API 호출 중 에러: {str(e)}")
-            else:
-                print("⚠️ LLM(Colab) URL이 등록되어 있지 않습니다. 기본값 사용")
+                    except json.JSONDecodeError as e:
+                        print("❗ JSON 파싱 실패:", e)
+                else:
+                    print(f"Colab LLM API 호출 실패: {resp.status_code} - {resp.text}")
+            except Exception as e:
+                print(f"Colab LLM API 호출 중 에러: {str(e)}")
+
 
             # ✅ 추천된 경우에만 DB 저장 및 FCM 푸시
             db_message = DbMessage(
