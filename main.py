@@ -52,3 +52,8 @@ def call_llm(prompt: str):
     import requests
     resp = requests.post(f"{app.state.llm_url}/generate", json={"prompt": prompt})
     return resp.json()
+
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.environ.get("PORT", 8080))
+    uvicorn.run("main:app", host="0.0.0.0", port=port)
