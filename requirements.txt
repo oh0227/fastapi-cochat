@@ -28,3 +28,5 @@ fastapi
 uvicorn 
 nest_asyncio 
 lxml[html_clean]
+
+psycopg2
