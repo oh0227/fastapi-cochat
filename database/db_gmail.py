@@ -357,7 +357,14 @@ async def gmail_push(request: Request, db: Session = Depends(get_db)):
                 if resp.status_code == 200:
                     try:
                         response_data = resp.json()
-                        print("Colab API 응답 성공:", json.dumps(response_data, indent=2, ensure_ascii=False))
+                        try:
+                            short_response_data = dict(response_data)
+                            if "embedding_vector" in short_response_data:
+                                ev = short_response_data["embedding_vector"]
+                                short_response_data["embedding_vector"] = ev[:10] + ["..."] if isinstance(ev, list) else ev
+                            print("Colab API 응답 (요약):", json.dumps(short_response_data, indent=2, ensure_ascii=False))
+                        except Exception as e:
+                            print(f"응답 요약 출력 실패: {e}")
                         # 📌 Colab 응답에서 필드 추출
                         recommended = response_data.get("recommended", True)  # 기본값은 True
                         category = response_data.get("category", "others")
