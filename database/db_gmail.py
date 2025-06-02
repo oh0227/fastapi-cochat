@@ -344,7 +344,7 @@ async def gmail_push(request: Request, db: Session = Depends(get_db)):
                     "content": body_text,
                     "preference_vector": user.preference_vector 
                 }
-                
+
                 # ✅ preference_vector 길이 요약
                 try:
                     preview_payload = dict(message_payload)
@@ -414,17 +414,26 @@ async def gmail_push(request: Request, db: Session = Depends(get_db)):
             )
             db.add(db_message)
 
-            if recommended and user.fcm_token:
+            if user.fcm_token:
                 try:
                     send_fcm_push(
                         user.fcm_token,
                         title=f"새 메일: {subject or '(제목 없음)'}",
-                        body=summary or body_text[:50] or "새 메일이 도착했습니다."
+                        body=summary or body_text[:50] or "새 메일이 도착했습니다.",
+                        data={
+                            "gmail_message_id": msg_id,
+                            "sender_id": sender,
+                            "receiver_id": receiver,
+                            "subject": subject or "",
+                            "content": body_text,
+                            "category": category or "others",
+                            "recommended": json.dumps(recommended),  # 문자열로 보내야 안전
+                            "timestamp": datetime.utcnow().isoformat(),
+                            "messenger": "gmail",
+                        }
                     )
                 except Exception as e:
                     print(f"FCM 알림 전송 실패: {e}")
-            else:
-                print(f"User {user.cochat_id} has no FCM token.")
 
 
     db.commit()
