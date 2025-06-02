@@ -109,17 +109,19 @@ def update_user_preference_by_message(db: Session, cochat_id: str, message_id: s
 
     # 벡터 준비
     message_vector = np.array(message.embedding_vector, dtype=np.float32)
+    
     if user.preference_vector:
-        user_vector = np.array(json.loads(user.preference_vector))
+        user_vector = np.array(user.preference_vector, dtype=np.float32)
     else:
         user_vector = np.zeros(len(message_vector), dtype=np.float32)
 
-    # 간단한 평균 업데이트
+    # 벡터 업데이트 (단순 평균)
     updated_vector = ((user_vector + message_vector) / 2).tolist()
 
     # DB 반영
-    user.preference_vector = json.dumps(updated_vector)
-    message.liked = True  # ✅ 메시지도 같이 좋아요 처리
+    user.preference_vector = updated_vector  # ✅ JSON 컬럼이라 직접 할당 가능
+    message.liked = True
+
     db.commit()
 
     return {
@@ -127,7 +129,6 @@ def update_user_preference_by_message(db: Session, cochat_id: str, message_id: s
         "liked_message_id": message.id,
         "vector_length": len(updated_vector)
     }
-
 
 def delete_user(db: Session, id: int):
   user = db.query(DbUser).filter(DbUser.id == id).first()
