@@ -15,13 +15,14 @@ if firebase_json:
 else:
     raise RuntimeError("❗ Firebase credentials not found in environment variables")
 
-def send_fcm_push(token, title, body): 
+def send_fcm_push(token, title, body, data=None): 
     message = messaging.Message(
         notification=messaging.Notification(
             title=title,
             body=body
         ),
-        token=token
+        token=token,
+        data=data or {}
     )
     response = messaging.send(message)
     print('Successfully sent message:', response)
