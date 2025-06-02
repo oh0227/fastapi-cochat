@@ -344,7 +344,20 @@ async def gmail_push(request: Request, db: Session = Depends(get_db)):
                     "content": body_text,
                     "preference_vector": user.preference_vector 
                 }
-                print("Colab API 요청 데이터:", json.dumps(message_payload, indent=2, ensure_ascii=False))
+                
+                # ✅ preference_vector 길이 요약
+                try:
+                    preview_payload = dict(message_payload)
+                    pv = preview_payload.get("preference_vector")
+
+                    if isinstance(pv, list) and pv:
+                        preview_payload["preference_vector"] = pv[:10] + (["..."] if len(pv) > 10 else [])
+                    else:
+                        preview_payload["preference_vector"] = []
+
+                    print("Colab API 요청 데이터 (요약):", json.dumps(preview_payload, indent=2, ensure_ascii=False))
+                except Exception as e:
+                    print(f"요청 요약 출력 실패: {e}")
 
                 api_url = f"{LLM_SERVER_URL}/analyze_and_filter"
                 resp = requests.post(
@@ -359,12 +372,17 @@ async def gmail_push(request: Request, db: Session = Depends(get_db)):
                         response_data = resp.json()
                         try:
                             short_response_data = dict(response_data)
-                            if "embedding_vector" in short_response_data:
-                                ev = short_response_data["embedding_vector"]
-                                short_response_data["embedding_vector"] = ev[:10] + ["..."] if isinstance(ev, list) else ev
+                            ev = short_response_data.get("embedding_vector")
+
+                            if isinstance(ev, list) and ev:
+                                short_response_data["embedding_vector"] = ev[:10] + (["..."] if len(ev) > 10 else [])
+                            else:
+                                short_response_data["embedding_vector"] = []
+
                             print("Colab API 응답 (요약):", json.dumps(short_response_data, indent=2, ensure_ascii=False))
                         except Exception as e:
                             print(f"응답 요약 출력 실패: {e}")
+
                         # 📌 Colab 응답에서 필드 추출
                         recommended = response_data.get("recommended", True)  # 기본값은 True
                         category = response_data.get("category", "others")
