@@ -28,7 +28,7 @@ class UserPreference(BaseModel):
 
 class LikeMessageRequest(BaseModel):
     cochat_id: str
-    message_id: int
+    message_id: str
 
 # ===== 메신저 연동 계정 관련 =====
 
