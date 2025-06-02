@@ -21,7 +21,7 @@ GOOGLE_PROJECT_ID = os.getenv("GOOGLE_PROJECT_ID")
 PUBSUB_TOPIC_NAME = os.getenv("PUBSUB_TOPIC_NAME")
 REDIRECT_URI = os.getenv("REDIRECT_URI")
 SCOPE = "https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/userinfo.email"
-NGROK_URL = os.getenv("NGROK_URL")
+LLM_SERVER_URL = os.getenv("LLM_SERVER_URL")
 
 def extract_body(payload):
     if "body" in payload and "data" in payload["body"]:
@@ -346,7 +346,7 @@ async def gmail_push(request: Request, db: Session = Depends(get_db)):
                 }
                 print("Colab API 요청 데이터:", json.dumps(message_payload, indent=2, ensure_ascii=False))
 
-                api_url = f"{NGROK_URL}/analyze_and_filter"
+                api_url = f"{LLM_SERVER_URL}/analyze_and_filter"
                 resp = requests.post(
                     api_url,
                     json=message_payload,

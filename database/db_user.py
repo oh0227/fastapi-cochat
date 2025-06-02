@@ -8,7 +8,7 @@ import datetime
 import requests
 import os
 
-NGROK_URL = os.getenv("NGROK_URL")
+LLM_SERVER_URL = os.getenv("LLM_SERVER_URL")
 
 def create_user(db: Session, request: UserBase):
   new_user = DbUser(
@@ -65,7 +65,7 @@ def set_user_preferences(request: Request, db: Session, cochat_id: str, preferen
     joined = ", ".join(preferences)
 
     # 외부 LLM API 호출 준비
-    api_url = f"{NGROK_URL}/preference/create"  # 적절한 엔드포인트로 수정하세요
+    api_url = f"{LLM_SERVER_URL}/preference/create"  # 적절한 엔드포인트로 수정하세요
     message_payload = {"text": joined}
 
     try:
