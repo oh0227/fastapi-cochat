@@ -1,6 +1,6 @@
 from database.hash import Hash
 from sqlalchemy.orm.session import Session
-from schemas import MessengerAccountBase, MessengerAccountCreate, MessengerAccountDisplay
+from schemas import MessengerAccountBase, MessengerAccountDelete
 from database.models import DbMessengerAccount
 from fastapi import HTTPException, status
 import datetime
@@ -62,14 +62,19 @@ def update_account(id: int, request: MessengerAccountBase, db: Session):
     return account.first()
 
 # Delete
-def delete_account(id: int, db: Session):
-    account = db.query(DbMessengerAccount).filter(DbMessengerAccount.id == id)
-    if not account.first():
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f'Account with id {id} not found'
-        )
-    
-    account.delete(synchronize_session=False)
+def delete_messenger_account(request: MessengerAccountDelete, db: Session):
+    cochat_id = request.user_id
+    messenger = request.messenger
+    messenger_user_id = request.messenger_user_id
+
+    account = (
+        db.query(DbMessengerAccount)
+        .filter_by(user_id=cochat_id, messenger=messenger, messenger_user_id=messenger_user_id)
+        .first()
+    )
+    if not account:
+        raise HTTPException(status_code=404, detail="Account not found")
+
+    db.delete(account)
     db.commit()
-    return {"status": "success", "message": "Account deleted"}
+    return {"status": "deleted"}

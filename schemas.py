@@ -50,6 +50,11 @@ class MessengerAccountDisplay(MessengerAccountBase):
     class Config:
         orm_mode = True
 
+class MessengerAccountDelete(BaseModel):
+    user_id: str
+    messenger: str
+    messenger_user_id: str
+
 # ===== 메시지 관련 =====
 
 class MessageBase(BaseModel):

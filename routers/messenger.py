@@ -2,7 +2,7 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from database.database import get_db
-from schemas import MessengerAccountBase, MessengerAccountCreate, MessengerAccountDisplay
+from schemas import MessengerAccountBase, MessengerAccountCreate, MessengerAccountDisplay, MessengerAccountDelete
 from database import db_messenger
 
 router = APIRouter(
@@ -54,12 +54,6 @@ def update_messenger_account(
     return db_messenger.update_account(id, request, db)
 
 # Delete
-@router.delete(
-    '/delete/{id}',
-    responses={
-        200: {"description": "Successfully deleted"},
-        404: {"description": "Not found"}
-    }
-)
-def delete_messenger_account(id: int, db: Session = Depends(get_db)):
-    return db_messenger.delete_account(id, db)
+@router.delete("/delete")
+def delete_messenger_account(req: MessengerAccountDelete, db: Session = Depends(get_db)):
+    return db_messenger.delete_messenger_account(req, db)
