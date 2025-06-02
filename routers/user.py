@@ -61,7 +61,7 @@ def update_preference_from_liked_message(
     return db_user.update_user_preference_by_message(
         db=db,
         cochat_id=req.cochat_id,
-        message_embedding=req.message_embedding
+        message_id=req.message_id
     )
 
 # Delete user
