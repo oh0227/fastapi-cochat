@@ -67,6 +67,7 @@ class MessageCreate(MessageBase):
 class MessageDisplay(MessageBase):
     id: int
     timestamp: Optional[datetime] = None
+    liked: Optional[bool] = None
     class Config:
         orm_mode = True
 
