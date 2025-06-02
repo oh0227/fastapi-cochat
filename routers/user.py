@@ -1,5 +1,5 @@
 from typing import List
-from schemas import UserBase, UserCreate, UserUpdate, UserDisplay, UserPreference
+from schemas import UserBase, UserCreate, UserUpdate, UserDisplay, UserPreference, LikeMessageRequest
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 from database.database import get_db
@@ -44,13 +44,25 @@ def update_user(
     return db_user.update_user(db, id, request)
 
 
-@router.post('/preferences')
+@router.post('/preference/create')
 def save_user_preferences(
     request: UserPreference,
     http_request: Request,  # <- 여기 추가
     db: Session = Depends(get_db)
 ):
     return db_user.set_user_preferences(http_request, db, request.cochat_id, request.preferences)
+
+
+@router.post("/preference/update")
+def update_preference_from_liked_message(
+    req: LikeMessageRequest,
+    db: Session = Depends(get_db)
+):
+    return db_user.update_user_preference_by_message(
+        db=db,
+        cochat_id=req.cochat_id,
+        message_embedding=req.message_embedding
+    )
 
 # Delete user
 @router.delete('/{id}', response_model=dict)

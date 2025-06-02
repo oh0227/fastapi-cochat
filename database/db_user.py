@@ -2,8 +2,10 @@ from database.hash import Hash
 from typing import List
 from sqlalchemy.orm.session import Session
 from schemas import UserBase, UserUpdate
-from database.models import DbUser
+from database.models import DbUser, DbMessage
 from fastapi import HTTPException, status, Request
+import numpy as np
+import json
 import datetime
 import requests
 import os
@@ -88,6 +90,43 @@ def set_user_preferences(request: Request, db: Session, cochat_id: str, preferen
     db.commit()
 
     return {"status": "success", "vector_length": len(embedding)}
+
+def update_user_preference_by_message(db: Session, cochat_id: str, message_id: int):
+    user = db.query(DbUser).filter(DbUser.cochat_id == cochat_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    message = db.query(DbMessage).filter(DbMessage.id == message_id).first()
+    if not message:
+        raise HTTPException(status_code=404, detail="Message not found")
+
+    if not message.embedding_vector:
+        raise HTTPException(status_code=400, detail="Message has no embedding vector")
+
+    # 이미 좋아요한 메시지인지 확인
+    if message.liked:
+        return {"status": "already_liked"}
+
+    # 벡터 준비
+    message_vector = np.array(message.embedding_vector, dtype=np.float32)
+    if user.preference_vector:
+        user_vector = np.array(json.loads(user.preference_vector))
+    else:
+        user_vector = np.zeros(len(message_vector), dtype=np.float32)
+
+    # 간단한 평균 업데이트
+    updated_vector = ((user_vector + message_vector) / 2).tolist()
+
+    # DB 반영
+    user.preference_vector = json.dumps(updated_vector)
+    message.liked = True  # ✅ 메시지도 같이 좋아요 처리
+    db.commit()
+
+    return {
+        "status": "success",
+        "liked_message_id": message.id,
+        "vector_length": len(updated_vector)
+    }
 
 
 def delete_user(db: Session, id: int):

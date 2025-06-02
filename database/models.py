@@ -47,5 +47,6 @@ class DbMessage(Base):
     category = Column(String)
     embedding_vector = Column(JSON) 
     timestamp = Column(DateTime)
+    liked = Column(Boolean, default=False)
     user = relationship("DbUser", back_populates="messages")
     messengers = relationship("DbMessengerAccount", back_populates="messages")
