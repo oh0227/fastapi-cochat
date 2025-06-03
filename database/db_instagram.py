@@ -94,14 +94,15 @@ def process_instagram_webhook(body: dict, db: Session):
     changes = entry.get("changes", [])
 
     for change in changes:
-        if change.get("field") == "conversations":
-            message_data = change.get("value", {})
-            sender_id = message_data.get("from")
-            recipient_id = message_data.get("to")
-            message_text = message_data.get("message", "")
+        if change.get("field") == "messages":
+            value = change.get("value", {})
+            sender_id = value.get("sender", {}).get("id")
+            recipient_id = value.get("recipient", {}).get("id")
+            timestamp = value.get("timestamp")
+            message_text = value.get("message", {}).get("text", "")
 
-            # 🔍 수신 메시지 출력
-            print(f"📩 Instagram 메시지 수신:\nFrom: {sender_id}\nTo: {recipient_id}\nMessage: {message_text}")
+            # 🔍 메시지 출력
+            print(f"📩 Instagram 메시지 수신:\nFrom: {sender_id}\nTo: {recipient_id}\nText: {message_text}\nTimestamp: {timestamp}")
 
             messenger_account = db.query(DbMessengerAccount).filter(
                 DbMessengerAccount.messenger_user_id == recipient_id,
