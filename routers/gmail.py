@@ -15,12 +15,12 @@ router = APIRouter(
     tags=['gmail']
 )
 
-@router.get("/auth/login")
+@router.get("/login")
 def login(cochat_id: str):
     # Google OAuth2 로그인 페이지로 리다이렉트
     return db_gmail.login(cochat_id)
 
-@router.get("/auth/callback")
+@router.get("/callback")
 def auth_callback(code: str, state: str, db: Session = Depends(get_db)):
     return db_gmail.auth_callback(code, state, db)
 
