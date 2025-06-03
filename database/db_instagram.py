@@ -11,9 +11,9 @@ from database.models import DbUser, DbMessengerAccount, DbMessage
 from database.database import get_db
 from fcm.fcm import send_fcm_push
 
+
 LLM_SERVER_URL = os.getenv("LLM_SERVER_URL", "https://your-colab-server.com")
 INSTAGRAM_VERIFY_TOKEN = os.getenv("INSTAGRAM_VERIFY_TOKEN", "default_verify_token")
-
 
 
 def generate_instagram_login_redirect(cochat_id: str):
@@ -89,7 +89,6 @@ def verify_instagram_webhook_token(
         return PlainTextResponse(content=hub_challenge)
     raise HTTPException(status_code=403, detail="Webhook verification failed")
 
-
 def process_instagram_webhook(body: dict, db: Session):
     entry = body.get("entry", [])[0]
     changes = entry.get("changes", [])
@@ -100,6 +99,9 @@ def process_instagram_webhook(body: dict, db: Session):
             sender_id = message_data.get("from")
             recipient_id = message_data.get("to")
             message_text = message_data.get("message", "")
+
+            # 🔍 수신 메시지 출력
+            print(f"📩 Instagram 메시지 수신:\nFrom: {sender_id}\nTo: {recipient_id}\nMessage: {message_text}")
 
             messenger_account = db.query(DbMessengerAccount).filter(
                 DbMessengerAccount.messenger_user_id == recipient_id,
@@ -133,7 +135,7 @@ def process_instagram_webhook(body: dict, db: Session):
                     embedding_vector = data.get("embedding_vector", [])
                     recommended = data.get("recommended", True)
             except Exception as e:
-                print(f"RAG 처리 실패: {e}")
+                print(f"⚠️ RAG 처리 실패: {e}")
 
             db_message = DbMessage(
                 messenger="instagram",
@@ -162,11 +164,11 @@ def process_instagram_webhook(body: dict, db: Session):
                             "category": category,
                             "timestamp": datetime.utcnow().isoformat(),
                             "messenger": "instagram",
-                            "recommended": json.dumps(recommended),  # 문자열로 보내야 안전
+                            "recommended": json.dumps(recommended),
                         }
                     )
                 except Exception as e:
-                    print(f"FCM 전송 실패: {e}")
+                    print(f"⚠️ FCM 전송 실패: {e}")
 
     db.commit()
     return {"status": "ok"}
