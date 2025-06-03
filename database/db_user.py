@@ -63,16 +63,16 @@ def set_user_preferences(request: Request, db: Session, cochat_id: str, preferen
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    # 선호 항목을 문자열로 결합
-    joined = ", ".join(preferences)
+    # 사용자 입력 원본 저장 (선택한 카테고리 리스트)
+    user.preference_raw = json.dumps(preferences, ensure_ascii=False)  # 한글 깨짐 방지
 
-    # 외부 LLM API 호출 준비
-    api_url = f"{LLM_SERVER_URL}/preference/create"  # 적절한 엔드포인트로 수정하세요
+    # 문자열로 결합해 LLM에 전달
+    joined = ", ".join(preferences)
     message_payload = {"text": joined}
 
     try:
         resp = requests.post(
-            api_url,
+            f"{LLM_SERVER_URL}/preference/create",
             json=message_payload,
             headers={"Content-Type": "application/json"},
             timeout=(10, 120)
@@ -85,7 +85,6 @@ def set_user_preferences(request: Request, db: Session, cochat_id: str, preferen
     except requests.RequestException as e:
         raise HTTPException(status_code=502, detail=f"Embedding server error: {str(e)}")
 
-    # DB에 벡터 저장
     user.preference_vector = embedding
     db.commit()
 

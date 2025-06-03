@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, UniqueConstraint, JSON
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, UniqueConstraint, JSON, Text
 from sqlalchemy.orm import relationship
 from database.database import Base
 
@@ -12,6 +12,7 @@ class DbUser(Base):
     password = Column(String)
     timestamp = Column(DateTime)
     fcm_token = Column(String, nullable=True)
+    preference_raw = Column(Text)
     preference_vector = Column(JSON) 
     # 여러 메신저 계정과 연결
     messengers = relationship("DbMessengerAccount", back_populates="user")
@@ -43,7 +44,7 @@ class DbMessage(Base):
     sender_id = Column(String)
     receiver_id = Column(String)  # 실제 수신자 주소 (예: 이메일)
     subject = Column(String)
-    content = Column(String)
+    content = Column(Text)
     category = Column(String)
     embedding_vector = Column(JSON) 
     timestamp = Column(DateTime)
