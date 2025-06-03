@@ -71,6 +71,7 @@ class MessageCreate(MessageBase):
 
 class MessageDisplay(MessageBase):
     id: int
+    gmail_message_id: str
     timestamp: Optional[datetime] = None
     liked: Optional[bool] = None
     class Config:
