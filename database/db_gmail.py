@@ -134,53 +134,6 @@ def auth_callback(code: str, state: str, db: Session = Depends(get_db)):
     return JSONResponse({"msg": "Login successful", "email": email})
 
 
-def get_gmail_messages(cochat_id: str, db: Session = Depends(get_db)):
-    """
-    DB에서 해당 email(수신자)의 모든 메시지 목록을 반환
-    """
-    messages = db.query(DbMessage)\
-        .filter(DbMessage.receiver_id == cochat_id)\
-        .order_by(DbMessage.timestamp.desc())\
-        .all()
-    if not messages:
-        raise HTTPException(status_code=404, detail="No messages found")
-    # 필요한 필드만 반환
-    return [
-        {
-            "id": msg.id,
-            "messenger": msg.messenger,
-            "sender_id": msg.sender_id,
-            "receiver_id": msg.receiver_id,
-            "content": msg.content,
-            "category": msg.category,
-            "timestamp": msg.timestamp,
-        }
-        for msg in messages
-    ]
-
-
-
-def get_gmail_latest_messages(cochat_id: str, db: Session = Depends(get_db)):
-    """
-    DB에서 해당 email(수신자)의 가장 최근 메시지 1개를 반환
-    """
-    msg = db.query(DbMessage)\
-        .filter(DbMessage.receiver_id == cochat_id)\
-        .order_by(DbMessage.timestamp.desc())\
-        .first()
-    if not msg:
-        raise HTTPException(status_code=404, detail="No messages found")
-    return {
-        "id": msg.id,
-        "messenger": msg.messenger,
-        "sender_id": msg.sender_id,
-        "receiver_id": msg.receiver_id,
-        "content": msg.content,
-        "category": msg.category,
-        "timestamp": msg.timestamp,
-    }
-
-
 
 def refresh_access_token(refresh_token: str):
     token_url = "https://oauth2.googleapis.com/token"

@@ -24,20 +24,6 @@ def login(cochat_id: str):
 def auth_callback(code: str, state: str, db: Session = Depends(get_db)):
     return db_gmail.auth_callback(code, state, db)
 
-@router.get("/messages")
-def get_gmail_messages(cochat_id: str, db: Session = Depends(get_db), current_user: UserDisplay = Depends(get_current_user)):
-    """
-    DB에서 해당 email(수신자)의 모든 메시지 목록을 반환
-    """
-    return db_gmail.get_gmail_messages(cochat_id, db)
-
-@router.get("/latest_messages")
-def get_gmail_latest_messages(cochat_id: str, db: Session = Depends(get_db), current_user: UserDisplay = Depends(get_current_user)):
-    """
-    DB에서 해당 email(수신자)의 가장 최근 메시지 1개를 반환
-    """
-    db_gmail.get_gmail_latest_messages(cochat_id, db)
-
 # =========================
 # Gmail Push Notification Webhook (Pub/Sub)
 # =========================
