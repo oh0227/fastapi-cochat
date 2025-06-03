@@ -91,12 +91,12 @@ def set_user_preferences(request: Request, db: Session, cochat_id: str, preferen
 
     return {"status": "success", "vector_length": len(embedding)}
 
-def update_user_preference_by_message(db: Session, cochat_id: str, message_id: int):
+def update_user_preference_by_message(db: Session, cochat_id: str, message_id: str):
     user = db.query(DbUser).filter(DbUser.cochat_id == cochat_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    message = db.query(DbMessage).filter(DbMessage.id == message_id).first()
+    message = db.query(DbMessage).filter(DbMessage.gmail_message_id == message_id).first()
     if not message:
         raise HTTPException(status_code=404, detail="Message not found")
 
