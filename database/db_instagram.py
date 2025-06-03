@@ -12,7 +12,7 @@ from database.database import get_db
 from fcm.fcm import send_fcm_push
 
 
-LLM_SERVER_URL = os.getenv("LLM_SERVER_URL", "https://your-colab-server.com")
+LLM_SERVER_URL = os.getenv("LLM_SERVER_URL", "https://fastapi-cochat-1.onrender.com")
 INSTAGRAM_VERIFY_TOKEN = os.getenv("INSTAGRAM_VERIFY_TOKEN", "default_verify_token")
 
 
@@ -117,17 +117,24 @@ def process_instagram_webhook(body: dict, db: Session):
                 continue
 
             category, summary, embedding_vector, recommended = "others", "", [], True
+
+            # ✅ LLM 서버 호출 payload 구성
+            message_payload = {
+                "cochat_id": user.cochat_id,
+                "sender_id": sender_id,
+                "receiver_id": recipient_id,
+                "subject": None,
+                "content": message_text,
+                "preference_vector": user.preference_vector,
+            }
+
             try:
+                api_url = f"{LLM_SERVER_URL}/analyze_and_filter"
                 resp = requests.post(
-                    f"{LLM_SERVER_URL}/analyze_and_filter",
-                    json={
-                        "cochat_id": user.cochat_id,
-                        "sender_id": sender_id,
-                        "receiver_id": recipient_id,
-                        "subject": None,
-                        "content": message_text,
-                        "preference_vector": user.preference_vector,
-                    }
+                    api_url,
+                    json=message_payload,
+                    headers={"Content-Type": "application/json"},
+                    timeout=(10, 120)
                 )
                 if resp.status_code == 200:
                     data = resp.json()
@@ -135,6 +142,8 @@ def process_instagram_webhook(body: dict, db: Session):
                     category = data.get("category", "others")
                     embedding_vector = data.get("embedding_vector", [])
                     recommended = data.get("recommended", True)
+                else:
+                    print(f"❌ LLM 서버 응답 오류: {resp.status_code} - {resp.text}")
             except Exception as e:
                 print(f"⚠️ RAG 처리 실패: {e}")
 
