@@ -1,9 +1,10 @@
 import os
+import json
 import requests
 from datetime import datetime
 
-from fastapi.responses import RedirectResponse, JSONResponse
-from fastapi import HTTPException
+from fastapi.responses import RedirectResponse, JSONResponse, PlainTextResponse
+from fastapi import HTTPException, Query
 from sqlalchemy.orm import Session
 
 from database.models import DbUser, DbMessengerAccount, DbMessage
@@ -11,6 +12,8 @@ from database.database import get_db
 from fcm.fcm import send_fcm_push
 
 LLM_SERVER_URL = os.getenv("LLM_SERVER_URL", "https://your-colab-server.com")
+INSTAGRAM_VERIFY_TOKEN = os.getenv("INSTAGRAM_VERIFY_TOKEN", "default_verify_token")
+
 
 
 def generate_instagram_login_redirect(cochat_id: str):
@@ -76,6 +79,15 @@ def handle_instagram_auth_callback(code: str, state: str, db: Session):
 
     db.commit()
     return JSONResponse({"msg": "Instagram login successful", "instagram_user_id": user_id})
+
+def verify_instagram_webhook_token(
+    hub_mode: str,
+    hub_challenge: str,
+    hub_verify_token: str
+):
+    if hub_mode == "subscribe" and hub_verify_token == INSTAGRAM_VERIFY_TOKEN:
+        return PlainTextResponse(content=hub_challenge)
+    raise HTTPException(status_code=403, detail="Webhook verification failed")
 
 
 def process_instagram_webhook(body: dict, db: Session):
@@ -150,6 +162,7 @@ def process_instagram_webhook(body: dict, db: Session):
                             "category": category,
                             "timestamp": datetime.utcnow().isoformat(),
                             "messenger": "instagram",
+                            "recommended": json.dumps(recommended),  # 문자열로 보내야 안전
                         }
                     )
                 except Exception as e:
