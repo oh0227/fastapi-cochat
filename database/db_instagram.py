@@ -46,6 +46,8 @@ def handle_instagram_auth_callback(code: str, state: str, db: Session):
         raise HTTPException(status_code=400, detail="Failed to get access token")
 
     tokens = response.json()
+    print("Instagram auth response:", tokens)  # 🔍 전체 응답 출력
+
     access_token = tokens["access_token"]
     user_id = tokens.get("user_id")
 
