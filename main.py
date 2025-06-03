@@ -4,6 +4,7 @@ from routers import gmail
 from routers import messenger
 from routers import message
 from routers import fcm_token
+from routers import facebook
 from database import models
 from auth import authentication
 from database.database import engine
@@ -12,6 +13,7 @@ import os
 
 app = FastAPI()
 
+app.include_router(facebook.router)
 app.include_router(fcm_token.router)
 app.include_router(message.router)
 app.include_router(messenger.router)
